@@ -4,3 +4,4 @@ tofu/.terraform/
 tofu/*.tfstate.backup
 tofu/keys/*
 !tofu/keys/*.pub
+tofu/*.tfplan

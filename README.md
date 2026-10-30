@@ -43,10 +43,10 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 ### 2. Schlüssel
 
 ```sh
-ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_hetzner -C "admin@hschaletzky-infra"         # mit Passphrase
-ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_deploy  -C "github-actions@hschaletzky-infra" -N ""
-cp ~/.ssh/hschaletzky_hetzner.pub tofu/keys/admin.pub
-cp ~/.ssh/hschaletzky_deploy.pub  tofu/keys/deploy.pub
+ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_com_hetzner -C "admin@hschaletzky-infra"         # mit Passphrase
+ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_com_deploy  -C "github-actions@hschaletzky-infra" -N ""
+cp ~/.ssh/hschaletzky_com_hetzner.pub tofu/keys/admin.pub
+cp ~/.ssh/hschaletzky_com_deploy.pub  tofu/keys/deploy.pub
 ```
 
 ### 3. Anlegen
@@ -60,7 +60,7 @@ tofu apply
 git add . && git commit -m "Infrastruktur angelegt" && git push
 ```
 
-cloud-init braucht danach etwa drei Minuten. Login: `ssh -i ~/.ssh/hschaletzky_hetzner hannes@<ipv4>`.
+cloud-init braucht danach etwa drei Minuten. Login: `ssh -i ~/.ssh/hschaletzky_com_hetzner hannes@<ipv4>`.
 
 ### 4. Nameserver bei Strato
 
@@ -75,7 +75,7 @@ In **jedem** Website-Repo und in diesem Repo: Environment `production` mit den S
 | Secret               | Inhalt                                          |
 | -------------------- | ----------------------------------------------- |
 | `DEPLOY_HOST`        | `tofu output -raw ipv4`                         |
-| `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hschaletzky_deploy` (privat) |
+| `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hschaletzky_com_deploy` (privat) |
 | `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`     |
 
 Pakete auf ghcr.io sind zunächst privat. Entweder unter *Package settings → Change visibility* auf **public** stellen
