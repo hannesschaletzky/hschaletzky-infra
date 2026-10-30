@@ -1,0 +1,32 @@
+# Öffentlicher Einstiegspunkt: TLS (Let's Encrypt), HTTP/3, Weiterleitungen.
+{
+	email info@hschaletzky.com
+}
+
+(standard) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20MiB
+			roll_keep_for 336h
+		}
+	}
+}
+
+hschaletzky.com {
+	import standard
+	reverse_proxy hschaletzky:3000
+}
+
+www.hschaletzky.com {
+	redir https://hschaletzky.com{uri} permanent
+}
+
+tischlerei-mustermann.hschaletzky.com {
+	import standard
+	reverse_proxy tischlerei:80
+}
