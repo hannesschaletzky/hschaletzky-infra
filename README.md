@@ -1,87 +1,91 @@
 # hschaletzky-infra
 
-Alles, was auf dem Hetzner-Server läuft. Ein Server, Docker Compose, Caddy davor.
+Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, darauf Docker Compose mit Caddy davor.
 
 ```
-                    ┌──────────────── Hetzner (Ubuntu 24.04) ────────────────┐
- Internet ──443──▶  │  caddy  ── TLS, HTTP/3, HSTS, Logs (14 Tage)            │
-                    │    ├── hschaletzky.com                 → hschaletzky:3000 │
-                    │    └── tischlerei-mustermann.hschaletzky.com → tischlerei:80 │
-                    └────────────────────────────────────────────────────────┘
+                    ┌──────────────── Hetzner (CX23, Ubuntu 24.04) ─────────────────┐
+ Internet ──443──▶  │  caddy  ── TLS, HTTP/3, HSTS, Logs (14 Tage)                   │
+                    │    ├── hschaletzky.com                       → hschaletzky:3000 │
+                    │    └── tischlerei-mustermann.hschaletzky.com → tischlerei:80    │
+                    └────────────────────────────────────────────────────────────────┘
             ▲ ghcr.io Images                     ▲ ssh deploy@server deploy <dienst>
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
 ```
 
-| Datei                 | Zweck                                                         |
-| --------------------- | ------------------------------------------------------------- |
-| `compose.yml`         | Alle Dienste. Eine neue Website = ein neuer Eintrag hier       |
-| `caddy/Caddyfile`     | Domains → Container, Zertifikate automatisch via Let's Encrypt |
-| `scripts/bootstrap.sh`| Einmalige Server-Einrichtung (Updates, Docker, Firewall, SSH-Härtung, Benutzer) |
-| `scripts/deploy.sh`   | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf |
+| Datei                    | Zweck                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `tofu/server.tf`         | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key     |
+| `tofu/dns.tf`            | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
+| `tofu/cloud-init.yaml`   | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
+| `tofu/terraform.tfstate` | State, mit AES-GCM verschlüsselt                                               |
+| `compose.yml`            | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
+| `caddy/Caddyfile`        | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
+| `scripts/deploy.sh`      | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
 
 ## Prinzip
 
+- **Der Server ist austauschbar.** Alles steckt in diesem Repo und in den Images. Die IP-Adressen sind eigene
+  Ressourcen und bleiben bei einem Neuaufbau (`tofu apply -replace=hcloud_server.web`) erhalten.
 - **Jede Website ist ihr eigenes Repo** mit Dockerfile und Workflow. Der Workflow baut ein Image nach `ghcr.io`
   und ruft danach `ssh deploy@server deploy <dienst>` auf.
 - **Der Deploy-Schlüssel kann nichts anderes.** In `authorized_keys` ist er per `command=` und `restrict` auf
   `deploy.sh` festgelegt. Damit gibt es keine Shell, kein Forwarding und nur Dienste aus der Allowlist.
-- **Änderungen an diesem Repo** (Compose, Caddy) werden per `sync.yml` ausgerollt: `git pull`, `up -d`, `caddy reload`.
+- **Änderungen an Compose oder Caddy** werden per `sync.yml` ausgerollt: `git pull`, `up -d`, `caddy reload`.
+- **Änderungen an `tofu/`** laufen lokal mit `tofu apply`. Danach den State committen.
 
 ## Ersteinrichtung
 
-### 1. Server
+### 1. Zugänge
 
-Ein CX22 (x86) oder CAX11 (ARM) mit Ubuntu 24.04 reicht für mehrere Websites. Die Images werden für beide Architekturen gebaut.
+- Hetzner Console → *Sicherheit → API-Tokens* → Token mit **Lesen & Schreiben** erstellen.
+- Eine lange Passphrase für den State erzeugen (mind. 16 Zeichen). Beides kommt in den Passwortmanager.
 
-### 2. Schlüssel erzeugen (lokal)
-
-```sh
-ssh-keygen -t ed25519 -f ~/.ssh/hetzner_deploy -C "github-actions-deploy" -N ""
-```
-
-### 3. Bootstrap (einmalig als root)
-
-Dieses Repo muss dafür öffentlich sein (es enthält keine Geheimnisse) oder vorher auf den Server kopiert werden.
+### 2. Schlüssel
 
 ```sh
-scp scripts/bootstrap.sh root@<server>:
-ssh root@<server> bash bootstrap.sh "$(cat ~/.ssh/id_ed25519.pub)" "$(cat ~/.ssh/hetzner_deploy.pub)"
+ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_hetzner -C "admin@hschaletzky-infra"         # mit Passphrase
+ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_deploy  -C "github-actions@hschaletzky-infra" -N ""
+cp ~/.ssh/hschaletzky_hetzner.pub tofu/keys/admin.pub
+cp ~/.ssh/hschaletzky_deploy.pub  tofu/keys/deploy.pub
 ```
 
-Danach in einem **zweiten Terminal** `ssh hannes@<server>` testen, bevor die Root-Sitzung geschlossen wird.
+### 3. Anlegen
 
-> Schon ein Server mit anderen Diensten im Einsatz? Dann das Skript vorher lesen und nur die passenden Abschnitte ausführen.
+```sh
+cd tofu
+export HCLOUD_TOKEN=...              # aus dem Passwortmanager
+export TF_VAR_state_passphrase=...   # aus dem Passwortmanager
+tofu init
+tofu apply
+git add . && git commit -m "Infrastruktur angelegt" && git push
+```
 
-### 4. DNS
+cloud-init braucht danach etwa drei Minuten. Login: `ssh -i ~/.ssh/hschaletzky_hetzner hannes@<ipv4>`.
 
-| Name                                   | Typ        | Wert                |
-| -------------------------------------- | ---------- | ------------------- |
-| `hschaletzky.com`                      | A / AAAA   | Server-IPv4 / IPv6  |
-| `www.hschaletzky.com`                  | CNAME      | `hschaletzky.com`   |
-| `tischlerei-mustermann.hschaletzky.com`| A / AAAA   | Server-IPv4 / IPv6  |
+### 4. Nameserver bei Strato
+
+Die Ausgabe `nameserver` bei Strato als externe Nameserver für `hschaletzky.com` eintragen. Die Zone enthält
+bereits alle bisherigen Einträge (Mail, SPF, DMARC, Autodiscover, Google-Verifizierung); `hschaletzky.com` zeigt
+weiterhin auf Vercel. Prüfen: `dig +short NS hschaletzky.com` und `dig +short MX hschaletzky.com`.
 
 ### 5. GitHub
 
 In **jedem** Website-Repo und in diesem Repo: Environment `production` mit den Secrets
 
-| Secret               | Inhalt                                             |
-| -------------------- | -------------------------------------------------- |
-| `DEPLOY_HOST`        | IP oder Hostname des Servers                        |
-| `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hetzner_deploy` (privat)         |
-| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <server>`       |
+| Secret               | Inhalt                                          |
+| -------------------- | ----------------------------------------------- |
+| `DEPLOY_HOST`        | `tofu output -raw ipv4`                         |
+| `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hschaletzky_deploy` (privat) |
+| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`     |
 
 Pakete auf ghcr.io sind zunächst privat. Entweder unter *Package settings → Change visibility* auf **public** stellen
 (empfohlen, die Images enthalten nichts Geheimes) oder auf dem Server einmal anmelden:
-`echo <PAT mit read:packages> | docker login ghcr.io -u hannesschaletzky --password-stdin` (als Benutzer `deploy`).
+`echo <PAT mit read:packages> | sudo -u deploy docker login ghcr.io -u hannesschaletzky --password-stdin`.
 
-### 6. Erster Start
+### 6. hschaletzky.com umziehen
 
-Beide Website-Repos einmal pushen (oder Workflow manuell starten), damit die Images existieren. Danach:
-
-```sh
-ssh hannes@<server>
-cd /opt/infra && sudo -u deploy docker compose up -d
-```
+Sobald der `hschaletzky`-Container läuft (`docker compose ps`), in `tofu/terraform.tfvars`
+`hschaletzky_auf_server = true` setzen und `tofu apply`. Damit zeigen A und AAAA auf den Server.
 
 ## Alltag
 
@@ -98,4 +102,4 @@ ssh hannes@<server> 'cd /opt/infra && TISCHLEREI_TAG=<sha> docker compose up -d 
 
 1. Dockerfile und `deploy.yml` in das neue Repo (Vorlage: `tischlerei-mustermann`), der letzte Schritt lautet `deploy <name>`
 2. Dienst in `compose.yml`, Domain in `caddy/Caddyfile`, Name in die Allowlist von `scripts/deploy.sh`
-3. DNS-Eintrag setzen, pushen, fertig
+3. DNS-Eintrag in `tofu/dns.tf`, `tofu apply`, pushen, fertig
