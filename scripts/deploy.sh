@@ -6,7 +6,7 @@ set -euo pipefail
 cd /opt/infra
 
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
-erlaubt=(hschaletzky tischlerei)
+erlaubt=(hschaletzky tischlerei sv-musterstadt)
 
 case "$aktion" in
   deploy)

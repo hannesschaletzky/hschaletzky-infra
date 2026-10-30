@@ -30,6 +30,12 @@ services:
     networks: [web]
     mem_limit: 128m
 
+  sv-musterstadt:
+    image: ghcr.io/hannesschaletzky/sv-musterstadt:${SV_MUSTERSTADT_TAG:-latest}
+    restart: unless-stopped
+    networks: [web]
+    mem_limit: 128m
+
 networks:
   web:
 

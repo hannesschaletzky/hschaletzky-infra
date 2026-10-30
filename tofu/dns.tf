@@ -50,6 +50,20 @@ resource "hcloud_zone_rrset" "tischlerei_aaaa" {
   records = [{ value = local.ipv6, comment = "web" }]
 }
 
+resource "hcloud_zone_rrset" "sv_musterstadt_a" {
+  zone    = local.zone
+  name    = "sv-musterstadt"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "sv_musterstadt_aaaa" {
+  zone    = local.zone
+  name    = "sv-musterstadt"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 # Nur diese CAs dürfen Zertifikate ausstellen: Let's Encrypt (Caddy, Vercel) und ZeroSSL/Sectigo (Caddys Fallback)
 resource "hcloud_zone_rrset" "caa" {
   zone = local.zone

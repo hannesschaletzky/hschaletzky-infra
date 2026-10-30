@@ -30,3 +30,8 @@ tischlerei-mustermann.hschaletzky.com {
 	import standard
 	reverse_proxy tischlerei:80
 }
+
+sv-musterstadt.hschaletzky.com {
+	import standard
+	reverse_proxy sv-musterstadt:80
+}
