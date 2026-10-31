@@ -9,7 +9,8 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Ordner statt Datei: git pull ersetzt die Datei, ein Datei-Mount hielte die alte Version fest
+      - ./caddy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
