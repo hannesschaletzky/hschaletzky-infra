@@ -10,11 +10,17 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 aus_schluesselbund() {
-  security find-generic-password -a "$USER" -s "$1" -w 2>/dev/null || {
+  local wert
+  wert="$(security find-generic-password -a "$USER" -s "$1" -w 2>/dev/null)" || {
     echo "Kein Eintrag '$1' im Schlüsselbund. Anlegen mit:" >&2
     echo "  security add-generic-password -a \"\$USER\" -s $1 -w" >&2
     exit 1
   }
+  # Enthält der Wert Zeichen außerhalb von ASCII (ä, ß, €), gibt security ihn als Hex aus: zurückwandeln
+  if [[ "$wert" =~ ^[0-9a-f]+$ && $((${#wert} % 2)) -eq 0 ]]; then
+    wert="$(printf %s "$wert" | xxd -r -p)"
+  fi
+  printf %s "$wert"
 }
 
 HCLOUD_TOKEN="$(aus_schluesselbund hschaletzky-hcloud-token)"
