@@ -31,7 +31,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 - **Der Deploy-Schlüssel kann nichts anderes.** In `authorized_keys` ist er per `command=` und `restrict` auf
   `deploy.sh` festgelegt. Damit gibt es keine Shell, kein Forwarding und nur Dienste aus der Allowlist.
 - **Änderungen an Compose oder Caddy** werden per `sync.yml` ausgerollt: `git pull`, `up -d`, `caddy reload`.
-- **Änderungen an `tofu/`** laufen lokal mit `tofu apply`. Danach den State committen.
+- **Änderungen an `tofu/`** laufen lokal mit `tofu/run.sh apply`. Danach den State committen.
 
 ## Ersteinrichtung
 
@@ -51,12 +51,19 @@ cp ~/.ssh/hschaletzky_com_deploy.pub  tofu/keys/deploy.pub
 
 ### 3. Anlegen
 
+Token und Passphrase einmalig in den macOS-Schlüsselbund legen. `-w` ohne Wert fragt danach, so landet nichts in der
+Shell-History:
+
 ```sh
-cd tofu
-export HCLOUD_TOKEN=...              # aus dem Passwortmanager
-export TF_VAR_state_passphrase=...   # aus dem Passwortmanager
-tofu init
-tofu apply
+security add-generic-password -a "$USER" -s hschaletzky-hcloud-token -w
+security add-generic-password -a "$USER" -s hschaletzky-tofu-passphrase -w
+```
+
+`tofu/run.sh` liest beide beim Aufruf aus und reicht alle Argumente an `tofu` weiter:
+
+```sh
+tofu/run.sh init
+tofu/run.sh apply
 git add . && git commit -m "Infrastruktur angelegt" && git push
 ```
 
@@ -102,4 +109,4 @@ ssh hannes@<server> 'cd /opt/infra && TISCHLEREI_TAG=<sha> docker compose up -d 
 
 1. Dockerfile und `deploy.yml` in das neue Repo (Vorlage: `tischlerei-mustermann`), der letzte Schritt lautet `deploy <name>`
 2. Dienst in `compose.yml`, Domain in `caddy/Caddyfile`, Name in die Allowlist von `scripts/deploy.sh`
-3. DNS-Eintrag in `tofu/dns.tf`, `tofu apply`, pushen, fertig
+3. DNS-Eintrag in `tofu/dns.tf`, `tofu/run.sh apply`, State committen, pushen, fertig
