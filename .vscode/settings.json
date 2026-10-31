@@ -1,0 +1,7 @@
+{
+  "terraform.languageServer.enable": false,
+  "files.associations": {
+    "*.tf": "opentofu",
+    "*.tfvars": "opentofu-vars"
+  }
+}
