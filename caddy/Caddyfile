@@ -35,3 +35,8 @@ sv-musterstadt.hschaletzky.com {
 	import standard
 	reverse_proxy sv-musterstadt:80
 }
+
+physio-musterfrau.hschaletzky.com {
+	import standard
+	reverse_proxy physio-musterfrau:80
+}
