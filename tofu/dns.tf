@@ -50,6 +50,20 @@ resource "hcloud_zone_rrset" "tischlerei_aaaa" {
   records = [{ value = local.ipv6, comment = "web" }]
 }
 
+resource "hcloud_zone_rrset" "tischlerei_maengel_a" {
+  zone    = local.zone
+  name    = "vorher.tischlerei-mustermann"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "tischlerei_maengel_aaaa" {
+  zone    = local.zone
+  name    = "vorher.tischlerei-mustermann"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 resource "hcloud_zone_rrset" "sv_musterstadt_a" {
   zone    = local.zone
   name    = "sv-musterstadt"

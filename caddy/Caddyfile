@@ -31,6 +31,19 @@ tischlerei-mustermann.hschaletzky.com {
 	reverse_proxy tischlerei:80
 }
 
+# Mängelfassung für den Beispielbericht des Website-Check-ups: bewusst ohne HSTS, sonst wie „standard“
+vorher.tischlerei-mustermann.hschaletzky.com {
+	encode zstd gzip
+	header -Server
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20MiB
+			roll_keep_for 336h
+		}
+	}
+	reverse_proxy tischlerei-maengel:80
+}
+
 sv-musterstadt.hschaletzky.com {
 	import standard
 	reverse_proxy sv-musterstadt:80

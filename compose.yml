@@ -31,6 +31,13 @@ services:
     networks: [web]
     mem_limit: 128m
 
+  # Mängelfassung der Tischlerei für den Beispielbericht des Website-Check-ups
+  tischlerei-maengel:
+    image: ghcr.io/hannesschaletzky/tischlerei-mustermann:${TISCHLEREI_MAENGEL_TAG:-maengel}
+    restart: unless-stopped
+    networks: [web]
+    mem_limit: 128m
+
   sv-musterstadt:
     image: ghcr.io/hannesschaletzky/sv-musterstadt:${SV_MUSTERSTADT_TAG:-latest}
     restart: unless-stopped
