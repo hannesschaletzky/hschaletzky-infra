@@ -5,6 +5,10 @@
 set -euo pipefail
 cd /opt/infra
 
+# Deploys aus mehreren Repos nacheinander ausführen, sonst räumt "image prune" Schichten eines laufenden Pulls weg
+exec 9>/tmp/hschaletzky-deploy.lock
+flock -w 600 9
+
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
 erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau)
 
