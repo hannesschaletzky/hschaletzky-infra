@@ -3,11 +3,15 @@
 Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, darauf Docker Compose mit Caddy davor.
 
 ```
-                    ┌──────────────── Hetzner (CX23, Ubuntu 24.04) ─────────────────┐
- Internet ──443──▶  │  caddy  ── TLS, HTTP/3, HSTS, Logs (14 Tage)                   │
-                    │    ├── hschaletzky.com                       → hschaletzky:3000 │
-                    │    └── tischlerei-mustermann.hschaletzky.com → tischlerei:80    │
-                    └────────────────────────────────────────────────────────────────┘
+                    ┌───────────────────────────── Hetzner (CX23, Ubuntu 24.04) ──────────────────────────────┐
+ Internet ──443──▶  │  caddy  ── TLS, HTTP/3, HSTS, Logs (14 Tage)                                            │
+                    │    ├── hschaletzky.com                              → hschaletzky:3000                  │
+                    │    ├── www.hschaletzky.com                          → Weiterleitung auf hschaletzky.com │
+                    │    ├── tischlerei-mustermann.hschaletzky.com        → tischlerei:80                     │
+                    │    ├── vorher.tischlerei-mustermann.hschaletzky.com → tischlerei-maengel:80 (ohne HSTS) │
+                    │    ├── sv-musterstadt.hschaletzky.com               → sv-musterstadt:80                 │
+                    │    └── physio-musterfrau.hschaletzky.com            → physio-musterfrau:80              │
+                    └─────────────────────────────────────────────────────────────────────────────────────────┘
             ▲ ghcr.io Images                     ▲ ssh deploy@server deploy <dienst>
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
 ```
