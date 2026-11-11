@@ -53,3 +53,8 @@ physio-musterfrau.hschaletzky.com {
 	import standard
 	reverse_proxy physio-musterfrau:80
 }
+
+quarantine.hschaletzky.com {
+	import standard
+	reverse_proxy quarantine:3000
+}

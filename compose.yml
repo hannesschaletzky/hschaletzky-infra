@@ -50,6 +50,15 @@ services:
     networks: [web]
     mem_limit: 128m
 
+  # Einkaufsliste (Next.js), die SQLite-Datei liegt im Volume und überlebt neue Images
+  quarantine:
+    image: ghcr.io/hannesschaletzky/quarantine_list:${QUARANTINE_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - quarantine_data:/data
+    networks: [web]
+    mem_limit: 256m
+
 networks:
   web:
 
@@ -57,3 +66,4 @@ volumes:
   caddy_data:
   caddy_config:
   caddy_logs:
+  quarantine_data:
