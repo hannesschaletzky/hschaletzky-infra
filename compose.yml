@@ -59,6 +59,15 @@ services:
     networks: [web]
     mem_limit: 256m
 
+  # Focus Game (Next.js), Spiele und Bestenliste in SQLite im Volume
+  focus:
+    image: ghcr.io/hannesschaletzky/focusgame:${FOCUS_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - focus_data:/data
+    networks: [web]
+    mem_limit: 256m
+
 networks:
   web:
 
@@ -67,3 +76,4 @@ volumes:
   caddy_config:
   caddy_logs:
   quarantine_data:
+  focus_data:

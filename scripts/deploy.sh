@@ -10,7 +10,7 @@ exec 9>/tmp/hschaletzky-deploy.lock
 flock -w 600 9
 
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
-erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine)
+erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus)
 
 case "$aktion" in
   deploy)

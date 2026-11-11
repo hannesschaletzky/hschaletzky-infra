@@ -58,3 +58,8 @@ quarantine.hschaletzky.com {
 	import standard
 	reverse_proxy quarantine:3000
 }
+
+focus.hschaletzky.com {
+	import standard
+	reverse_proxy focus:3000
+}

@@ -11,7 +11,8 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
                     │    ├── vorher.tischlerei-mustermann.hschaletzky.com → tischlerei-maengel:80 (ohne HSTS) │
                     │    ├── sv-musterstadt.hschaletzky.com               → sv-musterstadt:80                 │
                     │    ├── physio-musterfrau.hschaletzky.com            → physio-musterfrau:80              │
-                    │    └── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
+                    │    ├── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
+                    │    └── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
                     └─────────────────────────────────────────────────────────────────────────────────────────┘
             ▲ ghcr.io Images                     ▲ ssh deploy@server deploy <dienst>
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
