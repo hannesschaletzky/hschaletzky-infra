@@ -12,7 +12,9 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
                     │    ├── sv-musterstadt.hschaletzky.com               → sv-musterstadt:80                 │
                     │    ├── physio-musterfrau.hschaletzky.com            → physio-musterfrau:80              │
                     │    ├── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
-                    │    └── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
+                    │    ├── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
+                    │    └── pipeline.hschaletzky.com                     → hschaletzky-pipeline:3000         │
+                    │                                                        └─ Netz "db" (intern) → postgres │
                     └─────────────────────────────────────────────────────────────────────────────────────────┘
             ▲ ghcr.io Images                     ▲ ssh deploy@server deploy <dienst>
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
@@ -27,6 +29,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | `compose.yml`            | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
 | `caddy/Caddyfile`        | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
 | `scripts/deploy.sh`      | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
+| `scripts/push-secrets.sh` | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)        |
 
 ## Prinzip
 
@@ -110,6 +113,49 @@ ssh hannes@<server> 'cd /opt/infra && docker compose logs -f --tail=100 tischler
 # Rollback auf einen früheren Commit (jedes Image ist zusätzlich mit dem Git-SHA getaggt)
 ssh hannes@<server> 'cd /opt/infra && TISCHLEREI_TAG=<sha> docker compose up -d tischlerei'
 ```
+
+## Secrets
+
+Dienste mit Zugangsdaten bekommen sie als **Compose-Secrets**: Dateien unter `/opt/infra/secrets/`
+(gitignored, Verzeichnis `0700`), im Container unter `/run/secrets/<name>`, gelesen über
+`*_FILE`-Variablen. Sie tauchen damit weder in `docker inspect` noch in der Prozessumgebung auf,
+und jeder Container sieht nur seine eigenen.
+
+Quelle der Wahrheit ist der macOS-Schlüsselbund. `scripts/push-secrets.sh` überträgt alle Werte per
+Admin-SSH, mit `--generate` erzeugt es fehlende Datenbank-Passwörter vorher. Nach einem
+Server-Neuaufbau genügt ein Aufruf. Der Deploy-Schlüssel hat mit Secrets nichts zu tun.
+
+**Wichtig:** Fehlt eine Secret-Datei, bricht `sync` ab. Secrets also immer **vor** dem Push einer
+Compose-Änderung übertragen, die sie braucht.
+
+## Bewerbungs-Pipeline (Postgres)
+
+`hschaletzky-pipeline` ist der einzige Dienst mit Datenbank. Postgres hängt nur im internen Netz
+`db`, ohne veröffentlichten Port. Zwei Rollen:
+
+| Rolle          | Secret              | Wer                                                        |
+| -------------- | ------------------- | ---------------------------------------------------------- |
+| `pipeline`     | `pipeline_db_owner` | Postgres-Ersteinrichtung und `pipeline-migrate`            |
+| `pipeline_app` | `pipeline_db_app`   | die App; nur Daten lesen und schreiben, kein DDL           |
+
+`deploy.sh` führt vor jedem Deploy der App (und bei `sync`) `pipeline-migrate` aus: Migrationen und
+Rechte der App-Rolle, idempotent. Das Passwort der App-Rolle ändern: neuen Wert in den Schlüsselbund,
+`push-secrets.sh`, Deploy. Das Owner-Passwort gilt nur bei der Ersteinrichtung des Volumes; später
+per `ALTER ROLE pipeline PASSWORD '...'` ändern und danach das Secret aktualisieren.
+
+### Ersteinrichtung (Reihenfolge beachten)
+
+1. GitHub OAuth App anlegen (*Settings → Developer settings → OAuth Apps*), Callback
+   `https://pipeline.hschaletzky.com/oauth/github/callback`. Client-ID und -Secret in den Schlüsselbund.
+2. `scripts/push-secrets.sh --generate`
+3. Im Repo `hschaletzky-pipeline` das Environment `production` mit den drei `DEPLOY_*`-Secrets anlegen
+   und pushen. Der Build legt das Image an; der erste Deploy-Schritt scheitert noch (Dienst nicht in
+   der Allowlist), das ist erwartet.
+4. Paket `hschaletzky-pipeline` auf ghcr.io auf **public** stellen, sonst scheitert jeder `sync`.
+5. Dieses Repo pushen (`sync` startet Postgres, migriert, startet die App), dann
+   `tofu/run.sh apply` für den DNS-Eintrag und den State committen.
+6. Im Pipeline-Repo den Deploy erneut ausführen. Danach in claude.ai den Connector
+   `https://pipeline.hschaletzky.com/mcp` hinzufügen.
 
 ## Neue Website hinzufügen
 

@@ -10,7 +10,14 @@ exec 9>/tmp/hschaletzky-deploy.lock
 flock -w 600 9
 
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
-erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus)
+erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus hschaletzky-pipeline)
+
+# Datenbank-Migrationen der Pipeline (Owner-Rolle, idempotent). Vor der App ausführen, damit
+# neuer Code nie auf ein altes Schema trifft.
+pipeline_migrieren() {
+  docker compose up -d --wait postgres
+  docker compose run --rm pipeline-migrate
+}
 
 case "$aktion" in
   deploy)
@@ -19,11 +26,15 @@ case "$aktion" in
       exit 1
     fi
     docker compose pull "$dienst"
+    if [[ "$dienst" == hschaletzky-pipeline ]]; then
+      pipeline_migrieren
+    fi
     docker compose up -d --no-deps "$dienst"
     ;;
   sync)
     git pull --ff-only
     docker compose pull
+    pipeline_migrieren
     docker compose up -d --remove-orphans
     docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
     ;;

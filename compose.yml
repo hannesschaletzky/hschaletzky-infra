@@ -68,8 +68,87 @@ services:
     networks: [web]
     mem_limit: 256m
 
+  # Bewerbungs-Pipeline mit MCP-Server für claude.ai (Repo hschaletzky-pipeline).
+  # Nur das App-Secret, die App-Rolle darf Daten lesen und schreiben, nichts sonst.
+  hschaletzky-pipeline:
+    image: ghcr.io/hannesschaletzky/hschaletzky-pipeline:${PIPELINE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://pipeline_app@postgres:5432/pipeline
+      DATABASE_PASSWORD_FILE: /run/secrets/pipeline_db_app
+      PUBLIC_BASE_URL: https://pipeline.hschaletzky.com
+      GITHUB_CLIENT_ID_FILE: /run/secrets/pipeline_github_client_id
+      GITHUB_CLIENT_SECRET_FILE: /run/secrets/pipeline_github_client_secret
+      # Numerische GitHub-ID (ändert sich nicht, anders als der Login-Name), öffentlich abrufbar
+      GITHUB_ALLOWED_USER_ID: "29574225"
+    secrets: [pipeline_db_app, pipeline_github_client_id, pipeline_github_client_secret]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [web, db]
+    mem_limit: 256m
+
+  # Migrationen mit der Owner-Rolle, gleiches Image wie die App. Läuft nur über deploy.sh
+  # (Profil "tools", damit "up" ihn nicht dauerhaft startet). Setzt auch das Passwort der App-Rolle.
+  pipeline-migrate:
+    image: ghcr.io/hannesschaletzky/hschaletzky-pipeline:${PIPELINE_TAG:-latest}
+    profiles: [tools]
+    command: ["node", "dist/db/migrate.js"]
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: postgres://pipeline@postgres:5432/pipeline
+      MIGRATION_DATABASE_PASSWORD_FILE: /run/secrets/pipeline_db_owner
+      APP_DB_PASSWORD_FILE: /run/secrets/pipeline_db_app
+    secrets: [pipeline_db_owner, pipeline_db_app]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [db]
+
+  # Nur im internen Netz "db": kein veröffentlichter Port, Caddy kommt nicht heran.
+  postgres:
+    image: postgres:18.6-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pipeline
+      POSTGRES_DB: pipeline
+      # Gilt nur bei der Ersteinrichtung des Volumes. Später ändern: ALTER ROLE pipeline PASSWORD ...
+      POSTGRES_PASSWORD_FILE: /run/secrets/pipeline_db_owner
+    secrets: [pipeline_db_owner]
+    volumes:
+      # Postgres 18+ legt die Daten in einem versionierten Unterordner darunter ab
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipeline -d pipeline"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [db]
+    mem_limit: 512m
+
 networks:
   web:
+  # Intern: kein Zugang nach außen, nur App, Migration und Backup
+  db:
+    internal: true
+
+# Dateien liegen nur auf dem Server (gitignored), angelegt von scripts/push-secrets.sh
+secrets:
+  pipeline_db_owner:
+    file: ./secrets/pipeline_db_owner
+  pipeline_db_app:
+    file: ./secrets/pipeline_db_app
+  pipeline_github_client_id:
+    file: ./secrets/pipeline_github_client_id
+  pipeline_github_client_secret:
+    file: ./secrets/pipeline_github_client_secret
 
 volumes:
   caddy_data:
@@ -77,3 +156,4 @@ volumes:
   caddy_logs:
   quarantine_data:
   focus_data:
+  postgres_data:

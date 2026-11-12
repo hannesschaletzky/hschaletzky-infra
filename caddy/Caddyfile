@@ -63,3 +63,9 @@ focus.hschaletzky.com {
 	import standard
 	reverse_proxy focus:3000
 }
+
+# Bewerbungs-Pipeline (MCP-Server für claude.ai). Caddy schwärzt Authorization-Header in den Logs.
+pipeline.hschaletzky.com {
+	import standard
+	reverse_proxy hschaletzky-pipeline:3000
+}
