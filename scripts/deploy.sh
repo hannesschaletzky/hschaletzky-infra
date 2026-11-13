@@ -33,7 +33,9 @@ case "$aktion" in
     ;;
   sync)
     git pull --ff-only
-    docker compose pull
+    # Der Backup-Dienst wird lokal gebaut, nicht gezogen
+    docker compose pull --ignore-buildable
+    docker compose build backup
     pipeline_migrieren
     docker compose up -d --remove-orphans
     docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile

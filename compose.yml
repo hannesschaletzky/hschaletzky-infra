@@ -83,7 +83,11 @@ services:
       GITHUB_CLIENT_SECRET_FILE: /run/secrets/pipeline_github_client_secret
       # Numerische GitHub-ID (ändert sich nicht, anders als der Login-Name), öffentlich abrufbar
       GITHUB_ALLOWED_USER_ID: "29574225"
+      # Zeitpunkt des letzten erfolgreichen Backups: /health zeigt dessen Alter fürs Monitoring
+      BACKUP_STATUS_FILE: /backup-status/last-success
     secrets: [pipeline_db_app, pipeline_github_client_id, pipeline_github_client_secret]
+    volumes:
+      - backup_status:/backup-status:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,7 +110,8 @@ services:
       MIGRATION_DATABASE_URL: postgres://pipeline@postgres:5432/pipeline
       MIGRATION_DATABASE_PASSWORD_FILE: /run/secrets/pipeline_db_owner
       APP_DB_PASSWORD_FILE: /run/secrets/pipeline_db_app
-    secrets: [pipeline_db_owner, pipeline_db_app]
+      BACKUP_DB_PASSWORD_FILE: /run/secrets/pipeline_db_backup
+    secrets: [pipeline_db_owner, pipeline_db_app, pipeline_db_backup]
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,11 +138,42 @@ services:
     networks: [db]
     mem_limit: 512m
 
+  # Tägliches Backup (03:00 UTC) auf die Storage Box, verschlüsselt mit age. Image wird auf
+  # dem Server gebaut (backup/). Test: docker compose run --rm backup now
+  backup:
+    build: ./backup
+    image: hschaletzky-backup:local
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGDATABASE: pipeline
+      # Nur Leserechte, Sitzungen sind read-only (angelegt vom Migrationsschritt der Pipeline)
+      PGUSER: pipeline_backup
+      # Unterkonto: sieht nur backups/, nur aus dem Hetzner-Netz erreichbar (tofu/backup.tf)
+      BACKUP_TARGET: u717862-sub1@u717862.your-storagebox.de
+      BACKUP_HOUR_UTC: "3"
+      RETENTION_DAYS: "30"
+    secrets: [pipeline_db_backup, backup_ssh_key]
+    volumes:
+      # Nicht read-only: SQLite im WAL-Modus braucht Schreibzugriff auf die -shm-Datei
+      - quarantine_data:/sources/quarantine
+      - focus_data:/sources/focus
+      - backup_status:/status
+    # Klartext-Kopien entstehen nur im RAM
+    tmpfs: [/tmp]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [db, backup]
+    mem_limit: 256m
+
 networks:
   web:
   # Intern: kein Zugang nach außen, nur App, Migration und Backup
   db:
     internal: true
+  # Nur für den Backup-Dienst: Weg nach außen zur Storage Box, ohne Zugang zu Caddy und Apps
+  backup:
 
 # Dateien liegen nur auf dem Server (gitignored), angelegt von scripts/push-secrets.sh
 secrets:
@@ -149,6 +185,11 @@ secrets:
     file: ./secrets/pipeline_github_client_id
   pipeline_github_client_secret:
     file: ./secrets/pipeline_github_client_secret
+  pipeline_db_backup:
+    file: ./secrets/pipeline_db_backup
+  # Erzeugt auf dem Server von scripts/backup-ssh-key.sh, verlässt ihn nie
+  backup_ssh_key:
+    file: ./secrets/backup_ssh_key
 
 volumes:
   caddy_data:
@@ -157,3 +198,4 @@ volumes:
   quarantine_data:
   focus_data:
   postgres_data:
+  backup_status:

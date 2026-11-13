@@ -6,6 +6,7 @@
 #   scripts/push-secrets.sh --generate  erzeugt fehlende Datenbank-Passwörter vorher
 #
 # Der Schlüsselbund ist die Quelle der Wahrheit. Nach einem Server-Neuaufbau genügt ein Aufruf.
+# Nicht hier: der SSH-Schlüssel für Backups (entsteht auf dem Server, scripts/backup-ssh-key.sh).
 # GitHub-Werte von Hand anlegen (fragt nach dem Wert, landet nicht in der Shell-History):
 #   security add-generic-password -a "$USER" -s hschaletzky-pipeline-github-client-id -w
 #   security add-generic-password -a "$USER" -s hschaletzky-pipeline-github-client-secret -w
@@ -20,6 +21,7 @@ ZIEL=/opt/infra/secrets
 SECRETS=(
   pipeline_db_owner:hschaletzky-pipeline-db-owner:ja
   pipeline_db_app:hschaletzky-pipeline-db-app:ja
+  pipeline_db_backup:hschaletzky-pipeline-db-backup:ja
   pipeline_github_client_id:hschaletzky-pipeline-github-client-id:nein
   pipeline_github_client_secret:hschaletzky-pipeline-github-client-secret:nein
 )

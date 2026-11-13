@@ -20,15 +20,15 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
 ```
 
-| Datei                    | Zweck                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `tofu/server.tf`         | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key     |
-| `tofu/dns.tf`            | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
-| `tofu/cloud-init.yaml`   | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
-| `tofu/terraform.tfstate` | State, mit AES-GCM verschlüsselt                                               |
-| `compose.yml`            | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
-| `caddy/Caddyfile`        | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
-| `scripts/deploy.sh`      | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
+| Datei                     | Zweck                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `tofu/server.tf`          | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key    |
+| `tofu/dns.tf`             | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
+| `tofu/cloud-init.yaml`    | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
+| `tofu/terraform.tfstate`  | State, mit AES-GCM verschlüsselt                                                |
+| `compose.yml`             | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
+| `caddy/Caddyfile`         | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
+| `scripts/deploy.sh`       | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
 | `scripts/push-secrets.sh` | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)        |
 
 ## Prinzip
@@ -46,7 +46,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 
 ### 1. Zugänge
 
-- Hetzner Console → *Sicherheit → API-Tokens* → Token mit **Lesen & Schreiben** erstellen.
+- Hetzner Console → _Sicherheit → API-Tokens_ → Token mit **Lesen & Schreiben** erstellen.
 - Eine lange Passphrase für den State erzeugen (mind. 16 Zeichen). Beides kommt in den Passwortmanager.
 
 ### 2. Schlüssel
@@ -88,13 +88,13 @@ weiterhin auf Vercel. Prüfen: `dig +short NS hschaletzky.com` und `dig +short M
 
 In **jedem** Website-Repo und in diesem Repo: Environment `production` mit den Secrets
 
-| Secret               | Inhalt                                          |
-| -------------------- | ----------------------------------------------- |
-| `DEPLOY_HOST`        | `tofu output -raw ipv4`                         |
+| Secret               | Inhalt                                              |
+| -------------------- | --------------------------------------------------- |
+| `DEPLOY_HOST`        | `tofu output -raw ipv4`                             |
 | `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hschaletzky_com_deploy` (privat) |
-| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`     |
+| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`         |
 
-Pakete auf ghcr.io sind zunächst privat. Entweder unter *Package settings → Change visibility* auf **public** stellen
+Pakete auf ghcr.io sind zunächst privat. Entweder unter _Package settings → Change visibility_ auf **public** stellen
 (empfohlen, die Images enthalten nichts Geheimes) oder auf dem Server einmal anmelden:
 `echo <PAT mit read:packages> | sudo -u deploy docker login ghcr.io -u hannesschaletzky --password-stdin`.
 
@@ -133,10 +133,11 @@ Compose-Änderung übertragen, die sie braucht.
 `hschaletzky-pipeline` ist der einzige Dienst mit Datenbank. Postgres hängt nur im internen Netz
 `db`, ohne veröffentlichten Port. Zwei Rollen:
 
-| Rolle          | Secret              | Wer                                                        |
-| -------------- | ------------------- | ---------------------------------------------------------- |
-| `pipeline`     | `pipeline_db_owner` | Postgres-Ersteinrichtung und `pipeline-migrate`            |
-| `pipeline_app` | `pipeline_db_app`   | die App; nur Daten lesen und schreiben, kein DDL           |
+| Rolle             | Secret               | Wer                                               |
+| ----------------- | -------------------- | ------------------------------------------------- |
+| `pipeline`        | `pipeline_db_owner`  | Postgres-Ersteinrichtung und `pipeline-migrate`   |
+| `pipeline_app`    | `pipeline_db_app`    | die App; nur Daten lesen und schreiben, kein DDL  |
+| `pipeline_backup` | `pipeline_db_backup` | der Backup-Dienst; nur lesen, Sitzungen read-only |
 
 `deploy.sh` führt vor jedem Deploy der App (und bei `sync`) `pipeline-migrate` aus: Migrationen und
 Rechte der App-Rolle, idempotent. Das Passwort der App-Rolle ändern: neuen Wert in den Schlüsselbund,
@@ -145,7 +146,7 @@ per `ALTER ROLE pipeline PASSWORD '...'` ändern und danach das Secret aktualisi
 
 ### Ersteinrichtung (Reihenfolge beachten)
 
-1. GitHub OAuth App anlegen (*Settings → Developer settings → OAuth Apps*), Callback
+1. GitHub OAuth App anlegen (_Settings → Developer settings → OAuth Apps_), Callback
    `https://pipeline.hschaletzky.com/oauth/github/callback`. Client-ID und -Secret in den Schlüsselbund.
 2. `scripts/push-secrets.sh --generate`
 3. Im Repo `hschaletzky-pipeline` das Environment `production` mit den drei `DEPLOY_*`-Secrets anlegen
@@ -156,6 +157,57 @@ per `ALTER ROLE pipeline PASSWORD '...'` ändern und danach das Secret aktualisi
    `tofu/run.sh apply` für den DNS-Eintrag und den State committen.
 6. Im Pipeline-Repo den Deploy erneut ausführen. Danach in claude.ai den Connector
    `https://pipeline.hschaletzky.com/mcp` hinzufügen.
+
+## Backups
+
+Der Dienst `backup` ([backup/](backup/)) sichert täglich um 03:00 UTC:
+
+- die Pipeline-Datenbank (`pg_dump`, Custom-Format, mit der Rolle `pipeline_backup`)
+- die SQLite-Volumes von `quarantine` und `focus` (`sqlite3 .backup`, konsistent im laufenden Betrieb)
+
+Alles wird mit [age](https://age-encryption.org) für einen **öffentlichen** Schlüssel verschlüsselt
+([backup/age-recipients.txt](backup/age-recipients.txt)): Der Server kann seine Backups schreiben,
+aber nicht lesen. Der private Schlüssel liegt nur im Passwortmanager und im macOS-Schlüsselbund
+(`hschaletzky-backup-age`). Klartext entsteht nur im RAM (tmpfs).
+
+Ziel ist eine Hetzner Storage Box in fsn1, also nicht im Rechenzentrum des Servers
+([tofu/backup.tf](tofu/backup.tf)):
+
+| Ebene                         | Aufbewahrung | Wer kann löschen                                         |
+| ----------------------------- | ------------ | -------------------------------------------------------- |
+| `backups/daily/<Zeitpunkt>/`  | 30 Tage      | der Backup-Dienst (Unterkonto, nur aus dem Hetzner-Netz) |
+| Snapshots der Box (04:00 UTC) | 10 Tage      | nur über die Hetzner-API, nicht vom Server aus           |
+
+Wird der Server übernommen und `backups/` geleert, bleiben die Snapshots. Nach jedem erfolgreichen
+Lauf schreibt der Dienst einen Zeitstempel; `https://pipeline.hschaletzky.com/health` zeigt dessen
+Alter (`backup.ageHours`). Liegt es über 26 Stunden, ist ein Lauf ausgefallen.
+
+```sh
+scripts/backup-restore.sh list          # Stände auf der Box
+scripts/backup-restore.sh test          # Restore-Test: neuester Stand in ein Wegwerf-Postgres
+scripts/backup-restore.sh fetch [STAND] # entschlüsselt nach ~/hschaletzky-restore/<STAND>/
+
+# Auf dem Server: sofort sichern, Logs
+docker compose run --rm backup now
+docker compose logs backup
+```
+
+**Ernstfall Pipeline:** `fetch`, dann `pipeline.dump` auf den Server kopieren und mit
+`docker compose exec -T postgres pg_restore -U pipeline -d pipeline --clean --if-exists < pipeline.dump`
+einspielen, danach `deploy.sh sync` (setzt Rollen und Rechte neu). SQLite: App stoppen, Datei ins
+Volume kopieren (Eigentümer 1000), `-wal`/`-shm` daneben löschen, App starten.
+
+### Ersteinrichtung
+
+1. `tofu/run.sh apply` (Storage Box, Unterkonto, Snapshot-Plan)
+2. age-Schlüssel erzeugen: privater Teil in Passwortmanager und Schlüsselbund
+   (`hschaletzky-backup-age`), öffentlicher Teil nach `backup/age-recipients.txt`
+3. `scripts/push-secrets.sh --generate` (Passwort der Backup-Rolle)
+4. `scripts/backup-ssh-key.sh` (Schlüssel auf dem Server erzeugen, beim Unterkonto hinterlegen)
+5. Pipeline-Version mit Backup-Rolle deployen, dann dieses Repo pushen (`sync`)
+6. Auf dem Server `docker compose run --rm backup now`, am Mac `scripts/backup-restore.sh test`
+
+Nach einem Server-Neuaufbau: Schritte 3–5.
 
 ## Neue Website hinzufügen
 

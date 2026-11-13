@@ -1,0 +1,3 @@
+# Öffentlicher age-Schlüssel für Backups. Der private liegt im Passwortmanager und im
+# macOS-Schlüsselbund (Eintrag hschaletzky-backup-age), nie auf dem Server.
+age1664xhnyjmp9ye53erw7syw0a4056mngwjv7s0rss4e8j63d4ne5qdn3m44
