@@ -1,0 +1,19 @@
+# Monatlich, ohne automatisches Mergen: Änderungen hier wirken direkt auf dem Server
+# (Image-Versionen in compose.yml, Backup-Image, Actions des Sync-Workflows).
+version: 2
+updates:
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /backup
+    schedule:
+      interval: monthly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        update-types: [minor, patch]
