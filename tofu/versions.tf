@@ -6,6 +6,10 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~> 1.70"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.7"
+    }
   }
 
   # Der State liegt verschlüsselt im Repo (terraform.tfstate). Ohne Passphrase ist er unlesbar,
