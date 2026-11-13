@@ -69,3 +69,9 @@ pipeline.hschaletzky.com {
 	import standard
 	reverse_proxy hschaletzky-pipeline:3000
 }
+
+# Login und Tokens (OAuth) für die MCP-Connectoren, Repo hschaletzky-auth
+auth.hschaletzky.com {
+	import standard
+	reverse_proxy hschaletzky-auth:3000
+}

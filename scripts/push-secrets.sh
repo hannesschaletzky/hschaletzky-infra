@@ -8,8 +8,8 @@
 # Der Schlüsselbund ist die Quelle der Wahrheit. Nach einem Server-Neuaufbau genügt ein Aufruf.
 # Nicht hier: der SSH-Schlüssel für Backups (entsteht auf dem Server, scripts/backup-ssh-key.sh).
 # GitHub-Werte von Hand anlegen (fragt nach dem Wert, landet nicht in der Shell-History):
-#   security add-generic-password -a "$USER" -s hschaletzky-pipeline-github-client-id -w
-#   security add-generic-password -a "$USER" -s hschaletzky-pipeline-github-client-secret -w
+#   security add-generic-password -a "$USER" -s hschaletzky-auth-github-client-id -w
+#   security add-generic-password -a "$USER" -s hschaletzky-auth-github-client-secret -w
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,8 +22,11 @@ SECRETS=(
   pipeline_db_owner:hschaletzky-pipeline-db-owner:ja
   pipeline_db_app:hschaletzky-pipeline-db-app:ja
   pipeline_db_backup:hschaletzky-pipeline-db-backup:ja
-  pipeline_github_client_id:hschaletzky-pipeline-github-client-id:nein
-  pipeline_github_client_secret:hschaletzky-pipeline-github-client-secret:nein
+  auth_db_owner:hschaletzky-auth-db-owner:ja
+  auth_db_app:hschaletzky-auth-db-app:ja
+  auth_secret:hschaletzky-auth-secret:ja
+  auth_github_client_id:hschaletzky-auth-github-client-id:nein
+  auth_github_client_secret:hschaletzky-auth-github-client-secret:nein
 )
 
 aus_schluesselbund() {
@@ -60,4 +63,4 @@ for zeile in "${SECRETS[@]}"; do
   echo "Übertragen: $datei"
 done
 
-echo "Fertig. Neue Werte wirken nach: ssh deploy@$host deploy hschaletzky-pipeline"
+echo "Fertig. Neue Werte wirken nach einem Deploy des betroffenen Dienstes (ssh deploy@$host deploy <dienst>)"

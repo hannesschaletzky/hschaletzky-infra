@@ -134,6 +134,20 @@ resource "hcloud_zone_rrset" "pipeline_aaaa" {
   records = [{ value = local.ipv6, comment = "web" }]
 }
 
+resource "hcloud_zone_rrset" "auth_a" {
+  zone    = local.zone
+  name    = "auth"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "auth_aaaa" {
+  zone    = local.zone
+  name    = "auth"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 # Nur diese CAs dürfen Zertifikate ausstellen: Let's Encrypt (Caddy, Vercel) und ZeroSSL/Sectigo (Caddys Fallback)
 resource "hcloud_zone_rrset" "caa" {
   zone = local.zone

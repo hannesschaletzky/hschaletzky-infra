@@ -146,17 +146,41 @@ per `ALTER ROLE pipeline PASSWORD '...'` ändern und danach das Secret aktualisi
 
 ### Ersteinrichtung (Reihenfolge beachten)
 
-1. GitHub OAuth App anlegen (_Settings → Developer settings → OAuth Apps_), Callback
-   `https://pipeline.hschaletzky.com/oauth/github/callback`. Client-ID und -Secret in den Schlüsselbund.
-2. `scripts/push-secrets.sh --generate`
-3. Im Repo `hschaletzky-pipeline` das Environment `production` mit den drei `DEPLOY_*`-Secrets anlegen
+1. `scripts/push-secrets.sh --generate`
+2. Im Repo `hschaletzky-pipeline` das Environment `production` mit den drei `DEPLOY_*`-Secrets anlegen
    und pushen. Der Build legt das Image an; der erste Deploy-Schritt scheitert noch (Dienst nicht in
    der Allowlist), das ist erwartet.
-4. Paket `hschaletzky-pipeline` auf ghcr.io auf **public** stellen, sonst scheitert jeder `sync`.
-5. Dieses Repo pushen (`sync` startet Postgres, migriert, startet die App), dann
+3. Paket `hschaletzky-pipeline` auf ghcr.io auf **public** stellen, sonst scheitert jeder `sync`.
+4. Dieses Repo pushen (`sync` startet Postgres, migriert, startet die App), dann
    `tofu/run.sh apply` für den DNS-Eintrag und den State committen.
-6. Im Pipeline-Repo den Deploy erneut ausführen. Danach in claude.ai den Connector
-   `https://pipeline.hschaletzky.com/mcp` hinzufügen.
+5. Im Pipeline-Repo den Deploy erneut ausführen.
+
+Anmeldung und Tokens kommen von `hschaletzky-auth` (nächster Abschnitt). Die Pipeline prüft Tokens
+nur und hat keine eigenen OAuth-Zugangsdaten.
+
+## Login für Connectoren (hschaletzky-auth)
+
+`auth.hschaletzky.com` ist der OAuth-Server für alle MCP-Connectoren: GitHub-Login, nur für die
+GitHub-IDs in `ALLOWED_GITHUB_USER_IDS`. Er stellt JWT-Access-Tokens aus, je Token für genau einen
+Dienst aus `RESOURCES`. Die Dienste prüfen sie selbst gegen die öffentlichen Schlüssel
+(`/api/auth/jwks`, intern über `http://hschaletzky-auth:3000` abgerufen).
+
+Eigene Datenbank `auth-postgres` im internen Netz `auth-db`, Rollen wie bei der Pipeline
+(`auth` für Migrationen, `auth_app` für die App). Sie enthält nur kurzlebigen Zustand und wird
+**bewusst nicht gesichert**: Geht sie verloren, in claude.ai die Connectoren neu verbinden.
+
+**Neuen Dienst anbinden:** URL in `RESOURCES` ergänzen (Komma-getrennt), dieses Repo pushen.
+
+### Ersteinrichtung
+
+1. GitHub OAuth App anlegen (_Settings → Developer settings → OAuth Apps_), Callback
+   `https://auth.hschaletzky.com/api/auth/callback/github`. Client-ID und -Secret in den
+   Schlüsselbund (`hschaletzky-auth-github-client-id`, `hschaletzky-auth-github-client-secret`).
+2. `scripts/push-secrets.sh --generate`
+3. Repo `hschaletzky-auth`: Environment `production` mit den `DEPLOY_*`-Secrets, pushen, Paket auf
+   ghcr.io auf **public** stellen.
+4. Dieses Repo pushen (`sync`), dann `tofu/run.sh apply` für `auth.hschaletzky.com` und den State
+   committen.
 
 ## Backups
 
