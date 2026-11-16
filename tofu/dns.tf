@@ -159,6 +159,35 @@ resource "hcloud_zone_rrset" "caa" {
   ]
 }
 
+resource "hcloud_zone_rrset" "blog_a" {
+  zone    = local.zone
+  name    = "blog"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "blog_aaaa" {
+  zone    = local.zone
+  name    = "blog"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
+# Blog-Previews <slug>.preview.hschaletzky.com. Zertifikate holt Caddy nur für Previews mit eigener Site.
+resource "hcloud_zone_rrset" "preview_a" {
+  zone    = local.zone
+  name    = "*.preview"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "preview_aaaa" {
+  zone    = local.zone
+  name    = "*.preview"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 # ---------- Mail (Microsoft 365), 1:1 von Strato übernommen ----------
 
 resource "hcloud_zone_rrset" "mx" {

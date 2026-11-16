@@ -13,6 +13,8 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
                     │    ├── physio-musterfrau.hschaletzky.com            → physio-musterfrau:80              │
                     │    ├── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
                     │    ├── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
+                    │    ├── blog.hschaletzky.com                         → blog:80                           │
+                    │    ├── <slug>.preview.hschaletzky.com               → /srv/previews/<slug> (Dateien)    │
                     │    └── pipeline.hschaletzky.com                     → hschaletzky-pipeline:3000         │
                     │                                                        └─ Netz "db" (intern) → postgres │
                     └─────────────────────────────────────────────────────────────────────────────────────────┘
@@ -30,6 +32,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | `caddy/Caddyfile`         | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
 | `scripts/deploy.sh`       | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
 | `scripts/push-secrets.sh` | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)        |
+| `previews/`               | Blog-Previews pro Branch, nur auf dem Server (gitignored, angelegt von deploy.sh) |
 
 ## Prinzip
 
@@ -113,6 +116,24 @@ ssh hannes@<server> 'cd /opt/infra && docker compose logs -f --tail=100 tischler
 # Rollback auf einen früheren Commit (jedes Image ist zusätzlich mit dem Git-SHA getaggt)
 ssh hannes@<server> 'cd /opt/infra && TISCHLEREI_TAG=<sha> docker compose up -d tischlerei'
 ```
+
+## Blog-Previews
+
+Der Blog (privates Repo `hschaletzky-blog`) bekommt für jeden Branch außer `main` eine eigene Vorschau unter
+`https://<slug>.preview.hschaletzky.com`. Der Slug ist der Branch-Name ohne `claude/`, klein, nur `a-z0-9-`,
+höchstens 40 Zeichen.
+
+- **Kein Image, keine Registry.** Der Workflow baut die Seite und schickt sie als tar über die Deploy-SSH:
+  `tar -czf - -C dist . | ssh deploy@server preview <slug>`. Unveröffentlichte Entwürfe landen so nie auf ghcr.io.
+- **deploy.sh** prüft den Slug, entpackt nach `previews/<slug>` (GNU tar lehnt `..` und absolute Pfade ab,
+  Symlinks werden gelöscht, höchstens 200 MB, höchstens 20 Previews) und tauscht erst nach erfolgreichem
+  Entpacken aus.
+- **Caddy** bekommt pro Preview eine Datei `caddy/previews/<slug>.caddy` mit `import preview <slug>`, danach
+  `caddy reload`. Zertifikate gibt es damit nur für Previews, die existieren: kein On-Demand-TLS, kein
+  DNS-Plugin. DNS: ein Wildcard-Eintrag `*.preview`.
+- Previews senden `X-Robots-Tag: noindex` und zeigen einen Vorschau-Banner.
+- **Aufräumen:** Wird der Branch gelöscht (automatisch nach dem Merge), ruft der Workflow
+  `preview-remove <slug>` auf.
 
 ## Secrets
 

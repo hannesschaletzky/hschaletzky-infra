@@ -14,6 +14,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
+      # Blog-Previews, geschrieben von deploy.sh (gitignored)
+      - ./previews:/srv/previews:ro
     networks: [web]
 
   hschaletzky:
@@ -24,6 +26,13 @@ services:
       PORT: "3000"
     networks: [web]
     mem_limit: 512m
+
+  # Blog (Astro, statisch). Das Repo ist privat, das Image enthält nur veröffentlichte Artikel und ist public.
+  blog:
+    image: ghcr.io/hannesschaletzky/hschaletzky-blog:${BLOG_TAG:-latest}
+    restart: unless-stopped
+    networks: [web]
+    mem_limit: 64m
 
   tischlerei:
     image: ghcr.io/hannesschaletzky/tischlerei-mustermann:${TISCHLEREI_TAG:-latest}

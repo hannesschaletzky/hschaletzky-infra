@@ -7,3 +7,8 @@ tofu/*.tfstate.backup
 tofu/keys/*
 !tofu/keys/*.pub
 tofu/*.tfplan
+# Previews des Blogs: Inhalte und Caddy-Einträge legt deploy.sh auf dem Server an
+previews/*
+!previews/.gitkeep
+caddy/previews/*
+!caddy/previews/.gitkeep

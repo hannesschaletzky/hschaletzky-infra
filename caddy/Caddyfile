@@ -75,3 +75,26 @@ auth.hschaletzky.com {
 	import standard
 	reverse_proxy hschaletzky-auth:3000
 }
+
+# Blog, Repo hschaletzky-blog
+blog.hschaletzky.com {
+	import standard
+	reverse_proxy blog:80
+}
+
+# Preview pro Artikel-Branch: <slug>.preview.hschaletzky.com. deploy.sh legt je Preview eine Datei
+# caddy/previews/<slug>.caddy mit "import preview <slug>" an und lädt Caddy neu. Damit gibt es Zertifikate
+# nur für Previews, die es wirklich gibt (kein On-Demand-TLS, kein Wildcard-Zertifikat nötig).
+(preview) {
+	import standard
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Cache-Control "no-cache"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+	}
+	root * /srv/previews/{args[0]}
+	file_server
+}
+
+import previews/*.caddy
