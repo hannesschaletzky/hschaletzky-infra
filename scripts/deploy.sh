@@ -18,7 +18,10 @@ read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-}"
 declare -A rechte=(
   [hschaletzky-infra]="sync"
   [hschaletzky]="deploy:hschaletzky"
-  [hschaletzky-blog]="deploy:blog preview:* preview-remove:*"
+  # Blog: zwei Schlüssel. Der Deploy-Schlüssel liegt im GitHub-Environment production (nur main), der
+  # Preview-Schlüssel als Repo-Secret für alle Branches. Ein Branch-Workflow kommt so nie an "deploy blog".
+  [hschaletzky-blog]="deploy:blog"
+  [hschaletzky-blog-preview]="preview:* preview-remove:*"
   [fraktion_braeune]="deploy:fraktion-braeune"
   [tischlerei-mustermann]="deploy:tischlerei deploy:tischlerei-maengel"
   [sv-musterstadt]="deploy:sv-musterstadt"
