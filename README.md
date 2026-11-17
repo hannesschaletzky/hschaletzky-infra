@@ -46,8 +46,8 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
   und ruft danach `ssh deploy@server deploy <dienst>` auf.
 - **Jedes Repo hat einen eigenen Deploy-Schlüssel, und der kann nur das Nötigste.** In `authorized_keys` ist
   jeder per `command="deploy.sh <repo>"` und `restrict` festgelegt: keine Shell, kein Forwarding. Die Tabelle
-  `rechte` in `deploy.sh` bestimmt, was `<repo>` darf (meist nur `deploy <eigener-dienst>`; das Blog
-  Previews, dieses Repo nur `sync`). Ein geleakter Schlüssel betrifft so nur sein eigenes Repo.
+  `rechte` in `deploy.sh` bestimmt, was `<repo>` darf (meist nur `deploy <eigener-dienst>`; dieses
+  Repo nur `sync`). Ein geleakter Schlüssel betrifft so nur sein eigenes Repo.
   Das Blog hat zwei: `hschaletzky-blog` (nur `deploy blog`) liegt im GitHub-Environment `Production`, das
   nur `main` nutzen darf; `hschaletzky-blog-preview` (nur Previews) ist Repo-Secret für alle Branches.
   Beide heißen `DEPLOY_SSH_KEY`, das Environment-Secret überdeckt das Repo-Secret.
