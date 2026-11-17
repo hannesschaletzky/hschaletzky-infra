@@ -11,6 +11,11 @@ output "nameserver" {
   value       = hcloud_zone.hschaletzky.authoritative_nameservers.assigned
 }
 
+output "nameserver_fraktion_braeune" {
+  description = "Bei Strato als externe Nameserver für fraktion-braeune.de eintragen"
+  value       = hcloud_zone.fraktion_braeune.authoritative_nameservers.assigned
+}
+
 output "storage_box_host" {
   description = "Adresse der Storage Box (SFTP, Port 23)"
   value       = hcloud_storage_box.backup.server

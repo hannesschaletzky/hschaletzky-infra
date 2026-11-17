@@ -12,7 +12,7 @@ exec 9>/tmp/hschaletzky-deploy.lock
 flock -w 600 9
 
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
-erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus hschaletzky-pipeline hschaletzky-auth blog)
+erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus hschaletzky-pipeline hschaletzky-auth blog fraktion-braeune)
 
 # Blog-Previews: statische Dateien unter previews/<slug>, je eine Caddy-Site unter caddy/previews/<slug>.caddy
 # (beides gitignored). Der Slug landet im Caddyfile und im Pfad, daher streng prüfen.

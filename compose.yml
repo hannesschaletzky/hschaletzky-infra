@@ -34,6 +34,13 @@ services:
     networks: [web]
     mem_limit: 64m
 
+  # Fraktion Bräune (privates Spaßprojekt, Astro statisch), eigene Domain fraktion-braeune.de
+  fraktion-braeune:
+    image: ghcr.io/hannesschaletzky/fraktion_braeune:${FRAKTION_BRAEUNE_TAG:-latest}
+    restart: unless-stopped
+    networks: [web]
+    mem_limit: 64m
+
   tischlerei:
     image: ghcr.io/hannesschaletzky/tischlerei-mustermann:${TISCHLEREI_TAG:-latest}
     restart: unless-stopped

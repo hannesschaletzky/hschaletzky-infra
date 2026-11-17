@@ -82,6 +82,16 @@ blog.hschaletzky.com {
 	reverse_proxy blog:80
 }
 
+# Fraktion Bräune, Repo fraktion_braeune (eigene Domain, Zone in tofu/dns-fraktion-braeune.tf)
+fraktion-braeune.de {
+	import standard
+	reverse_proxy fraktion-braeune:80
+}
+
+www.fraktion-braeune.de {
+	redir https://fraktion-braeune.de{uri} permanent
+}
+
 # Preview pro Artikel-Branch: <slug>.preview.hschaletzky.com. deploy.sh legt je Preview eine Datei
 # caddy/previews/<slug>.caddy mit "import preview <slug>" an und lädt Caddy neu. Damit gibt es Zertifikate
 # nur für Previews, die es wirklich gibt (kein On-Demand-TLS, kein Wildcard-Zertifikat nötig).

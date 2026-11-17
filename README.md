@@ -14,6 +14,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
                     │    ├── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
                     │    ├── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
                     │    ├── blog.hschaletzky.com                         → blog:80                           │
+                    │    ├── fraktion-braeune.de (+ www → Weiterleitung)  → fraktion-braeune:80               │
                     │    ├── <slug>.preview.hschaletzky.com               → /srv/previews/<slug> (Dateien)    │
                     │    └── pipeline.hschaletzky.com                     → hschaletzky-pipeline:3000         │
                     │                                                        └─ Netz "db" (intern) → postgres │
@@ -26,6 +27,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | ------------------------- | ------------------------------------------------------------------------------- |
 | `tofu/server.tf`          | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key    |
 | `tofu/dns.tf`             | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
+| `tofu/dns-fraktion-braeune.tf` | Zone `fraktion-braeune.de` (Spaßprojekt, Mail weiter bei Strato)          |
 | `tofu/cloud-init.yaml`    | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
 | `tofu/terraform.tfstate`  | State, mit AES-GCM verschlüsselt                                                |
 | `compose.yml`             | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
