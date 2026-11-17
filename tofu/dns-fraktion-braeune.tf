@@ -57,3 +57,12 @@ resource "hcloud_zone_rrset" "fb_dmarc" {
   type    = "TXT"
   records = [{ value = provider::hcloud::txt_record("v=DMARC1;p=reject;") }]
 }
+
+# ---------- Verifizierung ----------
+
+resource "hcloud_zone_rrset" "fb_txt" {
+  zone    = local.zone_fb
+  name    = "@"
+  type    = "TXT"
+  records = [{ value = provider::hcloud::txt_record("google-site-verification=TwO9WZIFx6viTVWqxQaGT1AjuX2CtJVuIBab8f4f-D0") }]
+}
