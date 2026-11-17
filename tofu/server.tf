@@ -72,7 +72,10 @@ resource "hcloud_server" "web" {
   user_data = templatefile("${path.module}/cloud-init.yaml", {
     admin_user = var.admin_user
     admin_key  = trimspace(file("${path.module}/keys/admin.pub"))
-    deploy_key = trimspace(file("${path.module}/keys/deploy.pub"))
+    deploy_keys = {
+      for f in fileset("${path.module}/keys/deploy", "*.pub") :
+      trimsuffix(f, ".pub") => trimspace(file("${path.module}/keys/deploy/${f}"))
+    }
   })
 
   public_net {

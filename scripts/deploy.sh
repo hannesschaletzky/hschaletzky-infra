@@ -1,17 +1,66 @@
 #!/usr/bin/env bash
-# Wird über einen SSH-"forced command" aufgerufen: Der Deploy-Schlüssel kann nur dieses Skript ausführen.
+# Wird über einen SSH-"forced command" aufgerufen. Jedes Repo hat einen eigenen Deploy-Schlüssel, dessen
+# Zeile in authorized_keys lautet:  command="/opt/infra/scripts/deploy.sh <repo>",restrict <schlüssel>
+# Das Repo kommt also vom Server (Argument), der Befehl vom Aufrufer (SSH_ORIGINAL_COMMAND).
 # Aufruf aus CI:  ssh deploy@server deploy <dienst>
 #                 ssh deploy@server sync
 #                 tar -czf - -C dist . | ssh deploy@server preview <slug>   (Blog-Preview, Repo hschaletzky-blog)
 #                 ssh deploy@server preview-remove <slug>
+#                 ssh deploy@server rechte          (zeigt, was dieser Schlüssel darf; ändert nichts)
 set -euo pipefail
 cd /opt/infra
+
+repo="${1:-_alt}"
+read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-}"
+
+# Was welcher Schlüssel darf. "aktion:dienst", "aktion:*" (beliebiger Slug) oder nur "aktion".
+# Neues Repo: Schlüssel mit scripts/deploy-keys.sh anlegen und hier eintragen.
+declare -A rechte=(
+  [hschaletzky-infra]="sync"
+  [hschaletzky]="deploy:hschaletzky"
+  [hschaletzky-blog]="deploy:blog preview:* preview-remove:*"
+  [fraktion_braeune]="deploy:fraktion-braeune"
+  [tischlerei-mustermann]="deploy:tischlerei deploy:tischlerei-maengel"
+  [sv-musterstadt]="deploy:sv-musterstadt"
+  [physio-musterfrau]="deploy:physio-musterfrau"
+  [quarantine_list]="deploy:quarantine"
+  [focusgame]="deploy:focus"
+  [hschaletzky-pipeline]="deploy:hschaletzky-pipeline"
+  [hschaletzky-auth]="deploy:hschaletzky-auth"
+)
+
+# ÜBERGANG: Der alte, gemeinsame Schlüssel ruft ohne Argument auf und darf noch alles.
+# Wird entfernt, sobald alle Repos ihren eigenen Schlüssel haben.
+if [[ "$repo" == _alt ]]; then
+  rechte[_alt]="sync deploy:* preview:* preview-remove:*"
+fi
+
+if [[ -z "${rechte[$repo]+x}" ]]; then
+  echo "Unbekannter Deploy-Schlüssel ('$repo')" >&2
+  exit 1
+fi
+
+if [[ "$aktion" == rechte ]]; then
+  echo "Schlüssel $repo darf: ${rechte[$repo]}"
+  exit 0
+fi
+
+read -ra liste <<< "${rechte[$repo]}"
+darf=nein
+for recht in "${liste[@]}"; do
+  if [[ "$recht" == "$aktion" && -z "${dienst:-}" || "$recht" == "$aktion:${dienst:-}" || "$recht" == "$aktion:*" ]]; then
+    darf=ja
+  fi
+done
+if [[ "$darf" != ja ]]; then
+  echo "Schlüssel $repo darf '$aktion ${dienst:-}' nicht. Erlaubt: ${rechte[$repo]}" >&2
+  exit 1
+fi
 
 # Deploys aus mehreren Repos nacheinander ausführen, sonst räumt "image prune" Schichten eines laufenden Pulls weg
 exec 9>/tmp/hschaletzky-deploy.lock
 flock -w 600 9
 
-read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-$*}"
 erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterfrau quarantine focus hschaletzky-pipeline hschaletzky-auth blog fraktion-braeune)
 
 # Blog-Previews: statische Dateien unter previews/<slug>, je eine Caddy-Site unter caddy/previews/<slug>.caddy

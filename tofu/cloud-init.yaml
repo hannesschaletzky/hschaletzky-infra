@@ -20,8 +20,11 @@ users:
     shell: /bin/bash
     lock_passwd: true
     ssh_authorized_keys:
-      # Der Deploy-Schlüssel darf ausschließlich deploy.sh ausführen, keine Shell, kein Port-Forwarding.
-      - 'command="/opt/infra/scripts/deploy.sh",restrict ${deploy_key}'
+      # Ein Schlüssel pro Repo. Jeder darf ausschließlich "deploy.sh <repo>" ausführen, keine Shell, kein
+      # Port-Forwarding. Was <repo> darf, steht in scripts/deploy.sh. Pflege: scripts/deploy-keys.sh
+%{ for repo, key in deploy_keys ~}
+      - 'command="/opt/infra/scripts/deploy.sh ${repo}",restrict ${key}'
+%{ endfor ~}
 
 write_files:
   - path: /etc/ssh/sshd_config.d/10-hardening.conf
