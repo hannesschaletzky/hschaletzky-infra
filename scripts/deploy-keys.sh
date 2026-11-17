@@ -26,10 +26,6 @@ authorized_keys() {
     repo="$(basename "$pub" .pub)"
     echo "command=\"/opt/infra/scripts/deploy.sh $repo\",restrict $(cat "$pub")"
   done
-  # ÜBERGANG: alter, gemeinsamer Schlüssel, bis alle Repos umgestellt sind
-  if [[ -f tofu/keys/deploy.pub ]]; then
-    echo "command=\"/opt/infra/scripts/deploy.sh\",restrict $(cat tofu/keys/deploy.pub)"
-  fi
 }
 
 installieren() {
@@ -60,7 +56,7 @@ case "${1:-}" in
     install -d "$KEYS"
     cp "$tmp/key.pub" "$KEYS/$repo.pub"
     installieren
-    ssh -i "$tmp/key" -o IdentitiesOnly=yes "deploy@$host" rechte
+    ssh -n -i "$tmp/key" -o IdentitiesOnly=yes "deploy@$host" rechte
     gh secret set DEPLOY_SSH_KEY -R "$OWNER/$repo" ${env:+--env "$env"} < "$tmp/key"
     echo "Fertig: $repo. Ist das Repo neu, Rechte in scripts/deploy.sh eintragen und DEPLOY_HOST/DEPLOY_KNOWN_HOSTS setzen (README)."
     ;;

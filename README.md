@@ -32,7 +32,9 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | `tofu/terraform.tfstate`  | State, mit AES-GCM verschlüsselt                                                |
 | `compose.yml`             | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
 | `caddy/Caddyfile`         | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
-| `scripts/deploy.sh`       | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf               |
+| `scripts/deploy.sh`       | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf, mit Rechtetabelle pro Repo |
+| `scripts/deploy-keys.sh`  | Deploy-Schlüssel pro Repo erzeugen, auf den Server bringen, als GitHub-Secret setzen |
+| `tofu/keys/deploy/`       | Öffentliche Deploy-Schlüssel, einer pro Repo (`<repo>.pub`)                     |
 | `scripts/push-secrets.sh` | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)        |
 | `previews/`               | Blog-Previews pro Branch, nur auf dem Server (gitignored, angelegt von deploy.sh) |
 
@@ -42,8 +44,11 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
   Ressourcen und bleiben bei einem Neuaufbau (`tofu apply -replace=hcloud_server.web`) erhalten.
 - **Jede Website ist ihr eigenes Repo** mit Dockerfile und Workflow. Der Workflow baut ein Image nach `ghcr.io`
   und ruft danach `ssh deploy@server deploy <dienst>` auf.
-- **Der Deploy-Schlüssel kann nichts anderes.** In `authorized_keys` ist er per `command=` und `restrict` auf
-  `deploy.sh` festgelegt. Damit gibt es keine Shell, kein Forwarding und nur Dienste aus der Allowlist.
+- **Jedes Repo hat einen eigenen Deploy-Schlüssel, und der kann nur das Nötigste.** In `authorized_keys` ist
+  jeder per `command="deploy.sh <repo>"` und `restrict` festgelegt: keine Shell, kein Forwarding. Die Tabelle
+  `rechte` in `deploy.sh` bestimmt, was `<repo>` darf (meist nur `deploy <eigener-dienst>`; das Blog zusätzlich
+  Previews, dieses Repo nur `sync`). Ein geleakter Schlüssel betrifft so nur sein eigenes Repo.
+  `ssh deploy@server rechte` zeigt, was ein Schlüssel darf.
 - **Änderungen an Compose oder Caddy** werden per `sync.yml` ausgerollt: `git pull`, `up -d`, `caddy reload`.
 - **Änderungen an `tofu/`** laufen lokal mit `tofu/run.sh apply`. Danach den State committen.
 
@@ -58,10 +63,11 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 
 ```sh
 ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_com_hetzner -C "admin@hschaletzky-infra"         # mit Passphrase
-ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_com_deploy  -C "github-actions@hschaletzky-infra" -N ""
 cp ~/.ssh/hschaletzky_com_hetzner.pub tofu/keys/admin.pub
-cp ~/.ssh/hschaletzky_com_deploy.pub  tofu/keys/deploy.pub
 ```
+
+Deploy-Schlüssel entstehen pro Repo mit `scripts/deploy-keys.sh` (siehe 5.), sobald der Server läuft. Die
+öffentlichen Teile unter `tofu/keys/deploy/` nimmt cloud-init bei einem Neuaufbau automatisch mit.
 
 ### 3. Anlegen
 
@@ -96,8 +102,13 @@ In **jedem** Website-Repo und in diesem Repo: Environment `production` mit den S
 | Secret               | Inhalt                                              |
 | -------------------- | --------------------------------------------------- |
 | `DEPLOY_HOST`        | `tofu output -raw ipv4`                             |
-| `DEPLOY_SSH_KEY`     | Inhalt von `~/.ssh/hschaletzky_com_deploy` (privat) |
+| `DEPLOY_SSH_KEY`     | `scripts/deploy-keys.sh neu <repo> production`      |
 | `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`         |
+
+`deploy-keys.sh neu` erzeugt den Schlüssel, trägt ihn auf dem Server ein, testet ihn, setzt das Secret und
+löscht den privaten Teil lokal. Danach `tofu/keys/deploy/<repo>.pub` committen und für ein neues Repo die
+Rechte in der Tabelle `rechte` in `scripts/deploy.sh` eintragen. Verdacht auf ein Leck: einfach `neu` erneut
+aufrufen, der alte Schlüssel ist damit sofort ungültig.
 
 Pakete auf ghcr.io sind zunächst privat. Entweder unter _Package settings → Change visibility_ auf **public** stellen
 (empfohlen, die Images enthalten nichts Geheimes) oder auf dem Server einmal anmelden:

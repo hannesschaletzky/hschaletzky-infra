@@ -10,7 +10,7 @@
 set -euo pipefail
 cd /opt/infra
 
-repo="${1:-_alt}"
+repo="${1:-}"
 read -r aktion dienst _ <<< "${SSH_ORIGINAL_COMMAND:-}"
 
 # Was welcher Schlüssel darf. "aktion:dienst", "aktion:*" (beliebiger Slug) oder nur "aktion".
@@ -29,13 +29,7 @@ declare -A rechte=(
   [hschaletzky-auth]="deploy:hschaletzky-auth"
 )
 
-# ÜBERGANG: Der alte, gemeinsame Schlüssel ruft ohne Argument auf und darf noch alles.
-# Wird entfernt, sobald alle Repos ihren eigenen Schlüssel haben.
-if [[ "$repo" == _alt ]]; then
-  rechte[_alt]="sync deploy:* preview:* preview-remove:*"
-fi
-
-if [[ -z "${rechte[$repo]+x}" ]]; then
+if [[ -z "$repo" || -z "${rechte[$repo]+x}" ]]; then
   echo "Unbekannter Deploy-Schlüssel ('$repo')" >&2
   exit 1
 fi
