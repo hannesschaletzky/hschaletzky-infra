@@ -63,7 +63,9 @@ erlaubt=(hschaletzky tischlerei tischlerei-maengel sv-musterstadt physio-musterf
 # Blog-Previews: statische Dateien unter previews/<slug>, je eine Caddy-Site unter caddy/previews/<slug>.caddy
 # (beides gitignored). Der Slug landet im Caddyfile und im Pfad, daher streng prüfen.
 MAX_PREVIEWS=20
+# Komprimiert und entpackt begrenzen: Ein kleines Archiv kann sonst zu Gigabytes aufgehen (Gzip-Bombe)
 MAX_PREVIEW_BYTES=200000000
+MAX_PREVIEW_ENTPACKT=300000000
 
 slug_pruefen() {
   if [[ ! "${dienst:-}" =~ ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$ ]]; then
@@ -116,7 +118,12 @@ case "$aktion" in
     neu=$(mktemp -d previews/.neu-XXXXXX)
     trap 'rm -rf "$neu" "$ziel.alt"' EXIT
     # GNU tar lehnt absolute Pfade und ".." ab; Symlinks braucht eine statische Seite nicht
-    head -c "$MAX_PREVIEW_BYTES" | tar -xzf - -C "$neu" --no-same-owner --no-same-permissions
+    # Wird eine Grenze erreicht, bricht die Pipeline ab (pipefail) und der trap räumt auf
+    if ! head -c "$MAX_PREVIEW_BYTES" | gzip -dc | head -c "$MAX_PREVIEW_ENTPACKT" \
+      | tar -xf - -C "$neu" --no-same-owner --no-same-permissions; then
+      echo "Archiv ungültig oder zu groß (max. $MAX_PREVIEW_BYTES Bytes komprimiert, $MAX_PREVIEW_ENTPACKT entpackt)" >&2
+      exit 1
+    fi
     find "$neu" -type l -delete
     if [[ ! -f "$neu/index.html" ]]; then
       echo "Kein index.html im Archiv" >&2
