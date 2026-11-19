@@ -17,7 +17,7 @@ ADMIN_USER="${ADMIN_USER:-hannes}"
 ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
 ZIEL=/opt/infra/secrets
 
-# "Datei auf dem Server:Eintrag im Schlüsselbund:erzeugbar" (macOS-Bash 3.2 kennt keine Hash-Arrays)
+# "Datei auf dem Server:Eintrag im Schlüsselbund:erzeugbar (ja, lang, base64 oder nein)" (macOS-Bash 3.2 kennt keine Hash-Arrays)
 SECRETS=(
   pipeline_db_owner:hschaletzky-pipeline-db-owner:ja
   pipeline_db_app:hschaletzky-pipeline-db-app:ja
@@ -27,6 +27,8 @@ SECRETS=(
   auth_secret:hschaletzky-auth-secret:ja
   auth_github_client_id:hschaletzky-auth-github-client-id:nein
   auth_github_client_secret:hschaletzky-auth-github-client-secret:nein
+  plausible_secret_key_base:hschaletzky-plausible-secret-key-base:lang
+  plausible_totp_vault_key:hschaletzky-plausible-totp-vault-key:base64
 )
 
 aus_schluesselbund() {
@@ -36,9 +38,15 @@ aus_schluesselbund() {
 if [[ "${1:-}" == --generate ]]; then
   for zeile in "${SECRETS[@]}"; do
     IFS=: read -r _ eintrag erzeugbar <<< "$zeile"
-    if [[ "$erzeugbar" == ja ]] && ! aus_schluesselbund "$eintrag" >/dev/null; then
-      # 32 Zeichen ohne Sonderzeichen: unproblematisch in URLs und Shells
-      wert="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+    if [[ "$erzeugbar" != nein ]] && ! aus_schluesselbund "$eintrag" >/dev/null; then
+      case "$erzeugbar" in
+        # Plausible: SECRET_KEY_BASE braucht mindestens 64 Zeichen
+        lang) wert="$(openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c 64)" ;;
+        # Plausible: TOTP_VAULT_KEY sind genau 32 Byte, Base64-kodiert
+        base64) wert="$(openssl rand -base64 32)" ;;
+        # 32 Zeichen ohne Sonderzeichen: unproblematisch in URLs und Shells
+        *) wert="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)" ;;
+      esac
       security add-generic-password -a "$USER" -s "$eintrag" -w "$wert"
       echo "Erzeugt: $eintrag"
     fi

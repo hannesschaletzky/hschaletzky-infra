@@ -173,6 +173,21 @@ resource "hcloud_zone_rrset" "blog_aaaa" {
   records = [{ value = local.ipv6, comment = "web" }]
 }
 
+# Besucherstatistik (Plausible)
+resource "hcloud_zone_rrset" "stats_a" {
+  zone    = local.zone
+  name    = "stats"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "stats_aaaa" {
+  zone    = local.zone
+  name    = "stats"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 # Blog-Previews <slug>.preview.hschaletzky.com. Zertifikate holt Caddy nur für Previews mit eigener Site.
 resource "hcloud_zone_rrset" "preview_a" {
   zone    = local.zone

@@ -14,6 +14,8 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
                     │    ├── quarantine.hschaletzky.com                   → quarantine:3000 (SQLite-Volume)   │
                     │    ├── focus.hschaletzky.com                        → focus:3000 (SQLite-Volume)        │
                     │    ├── blog.hschaletzky.com                         → blog:80                           │
+                    │    ├── stats.hschaletzky.com                        → plausible:8000 (+ /js, /api/event │
+                    │    │                                                     über hschaletzky.com)            │
                     │    ├── fraktion-braeune.de (+ www → Weiterleitung)  → fraktion-braeune:80               │
                     │    ├── <slug>.preview.hschaletzky.com               → /srv/previews/<slug> (Dateien)    │
                     │    └── pipeline.hschaletzky.com                     → hschaletzky-pipeline:3000         │
