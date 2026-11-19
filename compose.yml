@@ -323,7 +323,7 @@ services:
     mem_limit: 1g
 
   # Server-Monitoring (Beszel): CPU, RAM, Festplatte und Netz, auch pro Container, mit Alarmen.
-  # Dashboard unter monitor.hschaletzky.com. Der Agent kommt dazu, sobald der Hub seinen Schlüssel kennt.
+  # Dashboard unter monitor.hschaletzky.com, System "hetzner-hschaletzky" über /beszel_socket/beszel.sock.
   beszel:
     image: henrygd/beszel:0.21.2
     restart: unless-stopped
@@ -334,6 +334,21 @@ services:
       - beszel_socket:/beszel_socket
     networks: [web]
     mem_limit: 256m
+
+  # Agent für den Hub: liest Host- und Container-Werte und spricht über eine Socket-Datei mit dem Hub
+  # (kein offener Port). KEY ist der öffentliche Schlüssel des Hubs, nicht geheim.
+  beszel-agent:
+    image: henrygd/beszel-agent:0.21.2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      LISTEN: /beszel_socket/beszel.sock
+      KEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPhGEbR7oHZz9CMTMhEw/syD19Ykkg5a1r6muhbp56il"
+    volumes:
+      - beszel_socket:/beszel_socket
+      - beszel_agent_data:/var/lib/beszel-agent
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    mem_limit: 64m
 
 networks:
   web:
@@ -390,3 +405,4 @@ volumes:
   plausible_events_logs:
   beszel_data:
   beszel_socket:
+  beszel_agent_data:
