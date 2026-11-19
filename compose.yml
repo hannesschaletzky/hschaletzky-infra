@@ -1,8 +1,21 @@
 name: web
 
+# Härtung für alle Dienste: Prozesse im Container können keine zusätzlichen Rechte erlangen
+# (setuid-Programme, Datei-Capabilities).
+x-gehaertet: &gehaertet
+  security_opt: [no-new-privileges:true]
+
+# Statische Seiten (Caddy mit fertigem HTML): Dateisystem nur lesbar. Caddy schreibt beim Start nur
+# Verwaltungsdaten nach /data und /config, die leben im RAM.
+x-statisch: &statisch
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs: [/data, /config, /tmp]
+
 services:
   caddy:
-    image: caddy:2-alpine
+    <<: *gehaertet
+    image: caddy:2.11.9-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -19,6 +32,7 @@ services:
     networks: [web]
 
   hschaletzky:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/hschaletzky:${HSCHALETZKY_TAG:-latest}
     restart: unless-stopped
     environment:
@@ -29,6 +43,7 @@ services:
 
   # Blog (Astro, statisch). Das Repo ist privat, das Image enthält nur veröffentlichte Artikel und ist public.
   blog:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/hschaletzky-blog:${BLOG_TAG:-latest}
     restart: unless-stopped
     networks: [web]
@@ -36,12 +51,14 @@ services:
 
   # Fraktion Bräune (privates Spaßprojekt, Astro statisch), eigene Domain fraktion-braeune.de
   fraktion-braeune:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/fraktion_braeune:${FRAKTION_BRAEUNE_TAG:-latest}
     restart: unless-stopped
     networks: [web]
     mem_limit: 64m
 
   tischlerei:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/tischlerei-mustermann:${TISCHLEREI_TAG:-latest}
     restart: unless-stopped
     networks: [web]
@@ -49,18 +66,21 @@ services:
 
   # Mängelfassung der Tischlerei für den Beispielbericht des Website-Check-ups
   tischlerei-maengel:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/tischlerei-mustermann:${TISCHLEREI_MAENGEL_TAG:-maengel}
     restart: unless-stopped
     networks: [web]
     mem_limit: 128m
 
   sv-musterstadt:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/sv-musterstadt:${SV_MUSTERSTADT_TAG:-latest}
     restart: unless-stopped
     networks: [web]
     mem_limit: 128m
 
   physio-musterfrau:
+    <<: *statisch
     image: ghcr.io/hannesschaletzky/physio-musterfrau:${PHYSIO_MUSTERFRAU_TAG:-latest}
     restart: unless-stopped
     networks: [web]
@@ -68,6 +88,7 @@ services:
 
   # Einkaufsliste (Next.js), die SQLite-Datei liegt im Volume und überlebt neue Images
   quarantine:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/quarantine_list:${QUARANTINE_TAG:-latest}
     restart: unless-stopped
     volumes:
@@ -77,6 +98,7 @@ services:
 
   # Focus Game (Next.js), Spiele und Bestenliste in SQLite im Volume
   focus:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/focusgame:${FOCUS_TAG:-latest}
     restart: unless-stopped
     volumes:
@@ -87,6 +109,7 @@ services:
   # Bewerbungs-Pipeline mit MCP-Server für claude.ai (Repo hschaletzky-pipeline).
   # Nur das App-Secret, die App-Rolle darf Daten lesen und schreiben, nichts sonst.
   hschaletzky-pipeline:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/hschaletzky-pipeline:${PIPELINE_TAG:-latest}
     restart: unless-stopped
     environment:
@@ -117,6 +140,7 @@ services:
   # Migrationen mit der Owner-Rolle, gleiches Image wie die App. Läuft nur über deploy.sh
   # (Profil "tools", damit "up" ihn nicht dauerhaft startet). Setzt auch das Passwort der App-Rolle.
   pipeline-migrate:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/hschaletzky-pipeline:${PIPELINE_TAG:-latest}
     profiles: [tools]
     command: ["node", "dist/db/migrate.js"]
@@ -134,6 +158,7 @@ services:
 
   # Nur im internen Netz "db": kein veröffentlichter Port, Caddy kommt nicht heran.
   postgres:
+    <<: *gehaertet
     image: postgres:18.6-alpine3.24
     restart: unless-stopped
     environment:
@@ -155,6 +180,7 @@ services:
 
   # Login und Tokens für die MCP-Connectoren (Repo hschaletzky-auth, Better Auth). Eigene Datenbank.
   hschaletzky-auth:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/hschaletzky-auth:${AUTH_TAG:-latest}
     restart: unless-stopped
     environment:
@@ -184,6 +210,7 @@ services:
 
   # Migrationen von hschaletzky-auth mit der Owner-Rolle, wie pipeline-migrate.
   auth-migrate:
+    <<: *gehaertet
     image: ghcr.io/hannesschaletzky/hschaletzky-auth:${AUTH_TAG:-latest}
     profiles: [tools]
     command: ["node", "dist/db/migrate.js"]
@@ -201,6 +228,7 @@ services:
   # Datenbank von hschaletzky-auth, getrennt von der Pipeline. Nur kurzlebiger Zustand (Sitzungen,
   # Clients, Tokens, Signierschlüssel), daher bewusst ohne Backup: Bei Verlust neu anmelden.
   auth-postgres:
+    <<: *gehaertet
     image: postgres:18.6-alpine3.24
     restart: unless-stopped
     environment:
@@ -221,6 +249,7 @@ services:
   # Tägliches Backup (03:00 UTC) auf die Storage Box, verschlüsselt mit age. Image wird auf
   # dem Server gebaut (backup/). Test: docker compose run --rm backup now
   backup:
+    <<: *gehaertet
     build: ./backup
     image: hschaletzky-backup:local
     restart: unless-stopped
@@ -251,6 +280,7 @@ services:
   # Dashboard unter stats.hschaletzky.com, das Zählskript läuft über hschaletzky.com selbst (Caddyfile).
   # Konfiguration liest Plausible als Dateien aus /run/secrets (Dateiname = Variable).
   plausible:
+    <<: *gehaertet
     image: ghcr.io/plausible/community-edition:v3.2.1
     restart: unless-stopped
     command: sh -c "/entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
@@ -284,6 +314,7 @@ services:
   # Konten und Einstellungen von Plausible. Nur im internen Netz "plausible" erreichbar,
   # deshalb ohne Passwort (wie die offizielle Vorlage).
   plausible-db:
+    <<: *gehaertet
     image: postgres:16.12-alpine
     restart: unless-stopped
     environment:
@@ -300,6 +331,7 @@ services:
 
   # Die Besuche selbst (ClickHouse), mit den Spar-Einstellungen der offiziellen Vorlage
   plausible-events:
+    <<: *gehaertet
     image: clickhouse/clickhouse-server:24.12-alpine
     restart: unless-stopped
     environment:
@@ -325,6 +357,7 @@ services:
   # Server-Monitoring (Beszel): CPU, RAM, Festplatte und Netz, auch pro Container, mit Alarmen.
   # Dashboard unter monitor.hschaletzky.com, System "hetzner-hschaletzky" über /beszel_socket/beszel.sock.
   beszel:
+    <<: *gehaertet
     image: henrygd/beszel:0.21.2
     restart: unless-stopped
     environment:
@@ -338,6 +371,7 @@ services:
   # Agent für den Hub: liest Host- und Container-Werte und spricht über eine Socket-Datei mit dem Hub
   # (kein offener Port). KEY ist der öffentliche Schlüssel des Hubs, nicht geheim.
   beszel-agent:
+    <<: *gehaertet
     image: henrygd/beszel-agent:0.21.2
     restart: unless-stopped
     network_mode: host

@@ -17,8 +17,30 @@
 	}
 }
 
+# Sicherheits-Header für Apps, die sie nicht selbst setzen. Die statischen Seiten (eigene
+# deploy/Caddyfile) und hschaletzky-auth setzen ihre eigenen. Keine Skript-CSP: die bräuchte jede App
+# einzeln; hier nur, was nie stört (kein Einbetten in fremde Seiten, kein MIME-Raten).
+(sicherheit) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		X-Frame-Options DENY
+		Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+	}
+}
+
+# Obergrenze für Anfrage-Bodies bei Apps mit offener Schreib-API (ohne Login): Ein einzelner
+# Request kann so nicht die Platte füllen, die sich alle Dienste teilen. Zu groß → 413.
+(kleine_bodies) {
+	request_body {
+		max_size 100KB
+	}
+}
+
 hschaletzky.com {
 	import standard
+	import sicherheit
 	# Zählskript und Ereignisse von Plausible über die eigene Domain, so lädt der Browser nichts von Dritten
 	@plausible path /js/script.* /js/pa-* /api/event
 	handle @plausible {
@@ -85,11 +107,15 @@ physio-musterfrau.hschaletzky.com {
 
 quarantine.hschaletzky.com {
 	import standard
+	import sicherheit
+	import kleine_bodies
 	reverse_proxy quarantine:3000
 }
 
 focus.hschaletzky.com {
 	import standard
+	import sicherheit
+	import kleine_bodies
 	reverse_proxy focus:3000
 }
 
