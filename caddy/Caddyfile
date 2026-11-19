@@ -67,6 +67,9 @@ www.hschaletzky.com {
 
 tischlerei-mustermann.hschaletzky.com {
 	import standard
+	# Erfundener Beispielbetrieb: aus der Google-Suche heraushalten, aber crawlbar lassen (sonst sieht Google
+	# das noindex nie). Kein nofollow: Links zu hschaletzky.com (Impressum, Demo-Leiste) sollen zählen.
+	header X-Robots-Tag "noindex"
 	@plausible path /js/pa-* /api/event
 	handle @plausible {
 		reverse_proxy plausible:8000
@@ -89,6 +92,9 @@ vorher.tischlerei-mustermann.hschaletzky.com {
 
 sv-musterstadt.hschaletzky.com {
 	import standard
+	# Erfundener Beispielbetrieb: aus der Google-Suche heraushalten, aber crawlbar lassen (sonst sieht Google
+	# das noindex nie). Kein nofollow: Links zu hschaletzky.com (Impressum, Demo-Leiste) sollen zählen.
+	header X-Robots-Tag "noindex"
 	@plausible path /js/pa-* /api/event
 	handle @plausible {
 		reverse_proxy plausible:8000
@@ -98,6 +104,9 @@ sv-musterstadt.hschaletzky.com {
 
 physio-musterfrau.hschaletzky.com {
 	import standard
+	# Erfundener Beispielbetrieb: aus der Google-Suche heraushalten, aber crawlbar lassen (sonst sieht Google
+	# das noindex nie). Kein nofollow: Links zu hschaletzky.com (Impressum, Demo-Leiste) sollen zählen.
+	header X-Robots-Tag "noindex"
 	@plausible path /js/pa-* /api/event
 	handle @plausible {
 		reverse_proxy plausible:8000
