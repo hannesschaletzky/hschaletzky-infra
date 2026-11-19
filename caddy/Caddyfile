@@ -20,7 +20,8 @@
 hschaletzky.com {
 	import standard
 	# Zählskript und Ereignisse von Plausible über die eigene Domain, so lädt der Browser nichts von Dritten
-	handle /js/script.* /js/pa-* /api/event {
+	@plausible path /js/script.* /js/pa-* /api/event
+	handle @plausible {
 		reverse_proxy plausible:8000
 	}
 	reverse_proxy hschaletzky:3000
