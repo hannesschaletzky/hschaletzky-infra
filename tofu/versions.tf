@@ -10,6 +10,11 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.7"
     }
+    # 2.0.0 wurde kurz veröffentlicht und wieder entfernt, deshalb die Obergrenze
+    uptimerobot = {
+      source  = "uptimerobot/uptimerobot"
+      version = ">= 1.13.1, < 2.0.0"
+    }
   }
 
   # Der State liegt verschlüsselt im Repo (terraform.tfstate). Ohne Passphrase ist er unlesbar,
@@ -34,3 +39,6 @@ terraform {
 
 # Token kommt aus der Umgebung: HCLOUD_TOKEN
 provider "hcloud" {}
+
+# Schlüssel kommt aus der Umgebung: UPTIMEROBOT_API_KEY (tofu/run.sh)
+provider "uptimerobot" {}

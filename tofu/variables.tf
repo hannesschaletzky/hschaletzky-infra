@@ -26,3 +26,8 @@ variable "hschaletzky_auf_server" {
   type        = bool
   default     = false
 }
+
+variable "uptimerobot_pushover_name" {
+  description = "Name der Pushover-Integration in UptimeRobot (Integrations & Team)"
+  type        = string
+}

@@ -70,3 +70,27 @@ provider "registry.opentofu.org/hetznercloud/hcloud" {
     "zh:f60b3e67be5cafe10001bb556ae7693e4a7696fb6946294643182946b36117f9",
   ]
 }
+
+provider "registry.opentofu.org/uptimerobot/uptimerobot" {
+  version     = "1.13.1"
+  constraints = ">= 1.13.1, < 2.0.0"
+  hashes = [
+    "h1:CjWR3dOqyoevjc2uCIPTIp3Tqo6igw9FgFfkci0dOtA=",
+    "h1:Xakej/J552KTHyw3ntP9uDMPmqM99RDWyJBN+7oM8n4=",
+    "h1:Xy8zhU/mpJ2AiE4/ZCbe83ZFFSUy4J7jMWXyRn9+nLQ=",
+    "h1:dHfh/LTAZdNAHgqecLbviz9MLMnxZsn9cQQayA9a/G0=",
+    "h1:iloAdZ0CYL0R9ZiN0ymcsmS181TrZx/hrN7CoxKGtjM=",
+    "h1:jrU1mMETPHwQ1+MNf4Ip7IJu+EsyXRzG1GyRe3nn3CI=",
+    "h1:t/5UUMQONouKoCtRt5ztsEjvFrkUoZVscTqW1hIQjtY=",
+    "h1:zWHvDCE+wSgZU+egLL9ipGljMRkYuWIG1VyTagL86kk=",
+    "zh:2b35680d78d6b44c3253b48b65cb0e90c038875fb2aeef4839d5fcc0cb00a000",
+    "zh:3432d4b8b8a0891fbf823628a24a9d87371390d1cef407eab7a8feab07edc945",
+    "zh:380a2f4b68f6e7f8c340909905334d00c6d2804fbeb9fd0955bd4021c0148cc4",
+    "zh:6828d11d8fc4e8ade865e31690f726046601e2c7a8c209adcc526b5df116cff0",
+    "zh:890df766e9b839623b1f0437355032a3c006226a6c200cd911e15ee1a9014e9f",
+    "zh:8bb0b3ab7330198679ebb27256d26e24a4132f5000d4c9a9423114b88080f12e",
+    "zh:a975e05ba0086b53fde76969a30fc4f6a579b938692d15448750cad627845953",
+    "zh:ef2f7a254686f9149dfdf0b3cf598116af2ce4507891e8516347660a27dc969e",
+    "zh:f39a20fe74c8ae6bbba7d49dee647ddd8e5d04b00020e04adeecafd1798e9c14",
+  ]
+}

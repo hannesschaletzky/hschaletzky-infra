@@ -31,6 +31,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | `tofu/server.tf`          | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key    |
 | `tofu/dns.tf`             | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
 | `tofu/dns-fraktion-braeune.tf` | Zone `fraktion-braeune.de` (Spaßprojekt, Mail weiter bei Strato)          |
+| `tofu/uptime.tf`          | Externe Erreichbarkeit: 7 Monitore bei UptimeRobot, Alarm per Pushover und E-Mail |
 | `tofu/cloud-init.yaml`    | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
 | `tofu/terraform.tfstate`  | State, mit AES-GCM verschlüsselt                                                |
 | `compose.yml`             | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
