@@ -90,6 +90,11 @@ auth.hschaletzky.com {
 # Blog, Repo hschaletzky-blog
 blog.hschaletzky.com {
 	import standard
+	# Plausible wie bei hschaletzky.com über die eigene Domain
+	@plausible path /js/pa-* /api/event
+	handle @plausible {
+		reverse_proxy plausible:8000
+	}
 	reverse_proxy blog:80
 }
 
