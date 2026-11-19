@@ -173,6 +173,21 @@ resource "hcloud_zone_rrset" "blog_aaaa" {
   records = [{ value = local.ipv6, comment = "web" }]
 }
 
+# Server-Monitoring (Beszel)
+resource "hcloud_zone_rrset" "monitor_a" {
+  zone    = local.zone
+  name    = "monitor"
+  type    = "A"
+  records = [{ value = local.ipv4, comment = "web" }]
+}
+
+resource "hcloud_zone_rrset" "monitor_aaaa" {
+  zone    = local.zone
+  name    = "monitor"
+  type    = "AAAA"
+  records = [{ value = local.ipv6, comment = "web" }]
+}
+
 # Besucherstatistik (Plausible)
 resource "hcloud_zone_rrset" "stats_a" {
   zone    = local.zone

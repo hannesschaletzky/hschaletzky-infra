@@ -27,6 +27,12 @@ hschaletzky.com {
 	reverse_proxy hschaletzky:3000
 }
 
+# Server-Monitoring (Beszel), Login nur für mich
+monitor.hschaletzky.com {
+	import standard
+	reverse_proxy beszel:8090
+}
+
 # Besucherstatistik (Plausible), Login nur für mich
 stats.hschaletzky.com {
 	import standard

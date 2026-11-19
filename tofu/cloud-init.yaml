@@ -53,6 +53,10 @@ write_files:
       { "log-driver": "local", "log-opts": { "max-size": "10m", "max-file": "3" } }
 
 runcmd:
+  # 2 GB Swap als Puffer, damit bei kurzzeitig vollem Speicher kein Prozess hart beendet wird
+  - fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/90-swap.conf
   # Docker aus dem offiziellen Repository
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc

@@ -322,6 +322,19 @@ services:
     networks: [plausible]
     mem_limit: 1g
 
+  # Server-Monitoring (Beszel): CPU, RAM, Festplatte und Netz, auch pro Container, mit Alarmen.
+  # Dashboard unter monitor.hschaletzky.com. Der Agent kommt dazu, sobald der Hub seinen Schlüssel kennt.
+  beszel:
+    image: henrygd/beszel:0.21.2
+    restart: unless-stopped
+    environment:
+      APP_URL: https://monitor.hschaletzky.com
+    volumes:
+      - beszel_data:/beszel_data
+      - beszel_socket:/beszel_socket
+    networks: [web]
+    mem_limit: 256m
+
 networks:
   web:
   # Intern: kein Zugang nach außen, nur App, Migration und Backup
@@ -375,3 +388,5 @@ volumes:
   plausible_db_data:
   plausible_events_data:
   plausible_events_logs:
+  beszel_data:
+  beszel_socket:
