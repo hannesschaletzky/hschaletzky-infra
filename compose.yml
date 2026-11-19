@@ -262,6 +262,9 @@ services:
       BACKUP_TARGET: u717862-sub1@u717862.your-storagebox.de
       BACKUP_HOUR_UTC: "3"
       RETENTION_DAYS: "30"
+      # Plausible mitsichern (Konten in Postgres, Besuche in ClickHouse); leer lassen = überspringen
+      PLAUSIBLE_PGHOST: plausible-db
+      PLAUSIBLE_CLICKHOUSE: plausible-events
     secrets: [pipeline_db_backup, backup_ssh_key]
     volumes:
       # Nicht read-only: SQLite im WAL-Modus braucht Schreibzugriff auf die -shm-Datei
@@ -273,7 +276,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks: [db, backup]
+    networks: [db, backup, plausible]
     mem_limit: 256m
 
   # Besucherstatistik ohne Cookies (Plausible Community Edition) für hschaletzky.com.

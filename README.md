@@ -229,6 +229,10 @@ Der Dienst `backup` ([backup/](backup/)) sichert täglich um 03:00 UTC:
 
 - die Pipeline-Datenbank (`pg_dump`, Custom-Format, mit der Rolle `pipeline_backup`)
 - die SQLite-Volumes von `quarantine` und `focus` (`sqlite3 .backup`, konsistent im laufenden Betrieb)
+- Plausible: Konten und Einstellungen (`pg_dump` von `plausible-db`) und die Besuche (ClickHouse, pro
+  Tabelle Schema, Daten im Format Native und Zeilenzahl, als tar). Zurückspielen: Plausible frisch starten
+  (die Migrationen legen das Schema an), Tabellen leeren, Daten per `INSERT … FORMAT Native` laden;
+  `backup-restore.sh test` zeigt die Befehle.
 
 Alles wird mit [age](https://age-encryption.org) für einen **öffentlichen** Schlüssel verschlüsselt
 ([backup/age-recipients.txt](backup/age-recipients.txt)): Der Server kann seine Backups schreiben,
@@ -249,7 +253,7 @@ Alter (`backup.ageHours`). Liegt es über 26 Stunden, ist ein Lauf ausgefallen.
 
 ```sh
 scripts/backup-restore.sh list          # Stände auf der Box
-scripts/backup-restore.sh test          # Restore-Test: neuester Stand in ein Wegwerf-Postgres
+scripts/backup-restore.sh test          # Restore-Test: neuester Stand in Wegwerf-Postgres/-ClickHouse
 scripts/backup-restore.sh fetch [STAND] # entschlüsselt nach ~/hschaletzky-restore/<STAND>/
 
 # Auf dem Server: sofort sichern, Logs

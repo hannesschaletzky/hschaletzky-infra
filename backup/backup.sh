@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tägliches Backup: Pipeline-Datenbank (pg_dump) und SQLite-Volumes, verschlüsselt mit age,
-# per SFTP auf die Storage Box.
+# Tägliches Backup: Pipeline-Datenbank (pg_dump), SQLite-Volumes und Plausible (Postgres und
+# ClickHouse), verschlüsselt mit age, per SFTP auf die Storage Box.
 #
 #   backup schedule   läuft dauerhaft, sichert täglich um BACKUP_HOUR_UTC (Standard im Container)
 #   backup now        sichert sofort einmal (Test: docker compose run --rm backup now)
@@ -30,9 +30,11 @@ run_backup() {
   local stamp
   stamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
   work="$(mktemp -d)"
-  trap 'rm -rf "$work"' EXIT
+  # Der Schlüssel liegt bewusst nicht in $work: Hochgeladen wird alles aus $work.
+  keydir="$(mktemp -d)"
+  trap 'rm -rf "$work" "$keydir"' EXIT
   # SSH lehnt Schlüssel ab, die andere lesen dürfen; das Compose-Secret ist 0444.
-  key="$work/ssh_key"
+  key="$keydir/ssh_key"
   install -m 600 /run/secrets/backup_ssh_key "$key"
 
   # Pipeline: Custom-Format (komprimiert, pg_restore kann einzelne Tabellen zurückholen)
@@ -56,12 +58,16 @@ run_backup() {
     done
   done
 
+  if [[ -n "${PLAUSIBLE_PGHOST:-}" ]]; then
+    plausible_sichern
+  fi
+
   # Erst unter .partial hochladen, dann umbenennen: Ein Abbruch hinterlässt nie einen
   # scheinbar vollständigen Stand.
   {
     echo "-mkdir daily"
     echo "mkdir daily/$stamp.partial"
-    echo "put $work/* daily/$stamp.partial/"
+    echo "put $work/*.age daily/$stamp.partial/"
     echo "rename daily/$stamp.partial daily/$stamp"
   } | sftp_batch >/dev/null
 
@@ -71,6 +77,30 @@ run_backup() {
   log "Backup $stamp hochgeladen: ${#files[@]} Dateien, $(du -ch "${files[@]}" | tail -1 | cut -f1)"
 
   aufraeumen
+}
+
+# Plausible: Konten und Einstellungen (Postgres) und die Besuche (ClickHouse).
+# ClickHouse wird pro Tabelle exportiert: Schema (SHOW CREATE), Daten im Format Native und die
+# Zeilenzahl, alles in einem tar. Dictionaries und Views entstehen aus den Tabellen und fehlen bewusst.
+plausible_sichern() {
+  pg_dump -h "$PLAUSIBLE_PGHOST" -U postgres -d plausible --format=custom \
+    | age -R "$RECIPIENTS" -o "$work/plausible.dump.age"
+
+  local url="http://$PLAUSIBLE_CLICKHOUSE:8123/?database=plausible_events_db"
+  local dir="$work/plausible-events" tabelle
+  mkdir "$dir"
+  ch() { wget -qO- --post-data "$1" "$url"; }
+  ch "SELECT name FROM system.tables WHERE database = currentDatabase()
+      AND (engine LIKE '%MergeTree' OR engine LIKE '%Log') ORDER BY name FORMAT TSV" >"$dir/tabellen.txt"
+  [[ -s "$dir/tabellen.txt" ]] || { log "FEHLER: keine ClickHouse-Tabellen gefunden"; return 1; }
+  while read -r tabelle; do
+    # Zeilenzahl vor dem Export: Der Restore-Test vergleicht damit (neue Besuche können dazukommen)
+    echo "$tabelle $(ch "SELECT count() FROM \`$tabelle\`")" >>"$dir/zeilen.txt"
+    ch "SHOW CREATE TABLE \`$tabelle\` FORMAT TSVRaw" >"$dir/$tabelle.sql"
+    ch "SELECT * FROM \`$tabelle\` FORMAT Native" | gzip >"$dir/$tabelle.native.gz"
+  done <"$dir/tabellen.txt"
+  tar -C "$work" -cf - plausible-events | age -R "$RECIPIENTS" -o "$work/plausible-events.tar.age"
+  rm -r "$dir"
 }
 
 # Löscht Stände, die älter als RETENTION_DAYS sind, und liegengebliebene .partial-Ordner.

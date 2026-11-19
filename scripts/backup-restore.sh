@@ -4,8 +4,9 @@
 #
 #   scripts/backup-restore.sh list            vorhandene Stände
 #   scripts/backup-restore.sh fetch [STAND]   holt und entschlüsselt einen Stand (Standard: neuester)
-#   scripts/backup-restore.sh test  [STAND]   Restore-Test: spielt den Dump in ein Wegwerf-Postgres
-#                                             ein, prüft die SQLite-Dateien und räumt alles wieder ab
+#   scripts/backup-restore.sh test  [STAND]   Restore-Test: spielt Pipeline und Plausible in Wegwerf-
+#                                             Container (Postgres, ClickHouse) ein, prüft die
+#                                             SQLite-Dateien und räumt alles wieder ab
 #
 # Snapshots älterer Tage: auf der Box unter .zfs/snapshot/<name>/backups/daily/ (nur lesen).
 set -euo pipefail
@@ -66,7 +67,8 @@ case "${1:-}" in
     stand="$(stand_waehlen "${2:-}")"
     ziel="$(mktemp -d)"
     container="restore-test-$$"
-    trap 'docker rm -f "$container" >/dev/null 2>&1 || true; rm -rf "$ziel"' EXIT
+    clickhouse="restore-test-ch-$$"
+    trap 'docker rm -f "$container" "$clickhouse" >/dev/null 2>&1 || true; rm -rf "$ziel"' EXIT
     holen "$stand" "$ziel"
 
     image="$(sed -n 's/^ *image: *\(postgres:[^ ]*\)$/\1/p' compose.yml | head -1)"
@@ -92,6 +94,45 @@ case "${1:-}" in
       echo "$(basename "$db"): $(sqlite3 "$db" 'pragma integrity_check'), Tabellen: $(sqlite3 "$db" \
         "select count(*) from sqlite_master where type = 'table'")"
     done
+    # Plausible: in Ständen vor dem 19.11.2026 noch nicht enthalten
+    if [[ -f "$ziel/plausible.dump" ]]; then
+      echo "== Plausible Postgres (Konten, Seiten)"
+      # Gleicher Wegwerf-Postgres: pg_restore muss mindestens so neu sein wie das pg_dump im Backup-Image
+      docker exec "$container" createdb -U postgres plausible
+      docker cp "$ziel/plausible.dump" "$container:/tmp/plausible.dump"
+      docker exec "$container" pg_restore -U postgres -d plausible --no-owner --no-acl --exit-on-error \
+        /tmp/plausible.dump
+      docker exec "$container" psql -U postgres -d plausible -Atc "
+        select format('%-24s %s', t, n) from (
+          select 'users' t, count(*) n from users union all
+          select 'sites', count(*) from sites union all
+          select 'goals', count(*) from goals) x"
+
+      echo "== Plausible ClickHouse (Besuche): Zeilen im Backup → wiederhergestellt"
+      mkdir "$ziel/ch"
+      tar -C "$ziel/ch" -xf "$ziel/plausible-events.tar"
+      ch_image="$(sed -n 's/^ *image: *\(clickhouse\/[^ ]*\)$/\1/p' compose.yml | head -1)"
+      docker run -d --name "$clickhouse" -e CLICKHOUSE_SKIP_USER_SETUP=1 "$ch_image" >/dev/null
+      until docker exec "$clickhouse" clickhouse-client -q "SELECT 1" >/dev/null 2>&1; do sleep 1; done
+      docker exec "$clickhouse" clickhouse-client -q "CREATE DATABASE plausible_events_db"
+      leer=0
+      while read -r tabelle erwartet; do
+        docker exec -i "$clickhouse" clickhouse-client --database plausible_events_db \
+          <"$ziel/ch/plausible-events/$tabelle.sql"
+        gunzip -c "$ziel/ch/plausible-events/$tabelle.native.gz" \
+          | docker exec -i "$clickhouse" clickhouse-client \
+            -q "INSERT INTO plausible_events_db.\`$tabelle\` FORMAT Native"
+        ist="$(docker exec "$clickhouse" clickhouse-client \
+          -q "SELECT count() FROM plausible_events_db.\`$tabelle\`")"
+        # Exakte Gleichheit ist nicht garantiert (neue Besuche, Collapsing-Merges), leer darf nichts sein
+        if (( erwartet > 0 && ist == 0 )); then leer=$((leer + 1)); markierung="  ← LEER"; else markierung=""; fi
+        printf '%-42s %8s → %s%s\n' "$tabelle" "$erwartet" "$ist" "$markierung"
+      done <"$ziel/ch/plausible-events/zeilen.txt"
+      (( leer == 0 )) || { echo "FEHLER: $leer Tabelle(n) ohne Daten wiederhergestellt" >&2; exit 1; }
+    else
+      echo "== Plausible: in diesem Stand nicht enthalten"
+    fi
+
     echo "Restore-Test erfolgreich. Wegwerf-Container und entschlüsselte Dateien werden gelöscht."
     ;;
   *)
