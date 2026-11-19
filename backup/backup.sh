@@ -81,7 +81,7 @@ run_backup() {
 
 # Plausible: Konten und Einstellungen (Postgres) und die Besuche (ClickHouse).
 # ClickHouse wird pro Tabelle exportiert: Schema (SHOW CREATE), Daten im Format Native und die
-# Zeilenzahl, alles in einem tar. Dictionaries und Views entstehen aus den Tabellen und fehlen bewusst.
+# Zeilenzahl, dazu das Schema der Dictionaries, alles in einem tar.
 plausible_sichern() {
   pg_dump -h "$PLAUSIBLE_PGHOST" -U postgres -d plausible --format=custom \
     | age -R "$RECIPIENTS" -o "$work/plausible.dump.age"
@@ -99,6 +99,13 @@ plausible_sichern() {
     ch "SHOW CREATE TABLE \`$tabelle\` FORMAT TSVRaw" >"$dir/$tabelle.sql"
     ch "SELECT * FROM \`$tabelle\` FORMAT Native" | gzip >"$dir/$tabelle.native.gz"
   done <"$dir/tabellen.txt"
+  # Dictionaries (Nachschlagetabellen): nur das Schema, ihre Daten stecken in den Quelltabellen.
+  # events_v2 und sessions_v2 berechnen Spalten mit dictGet und lassen sich erst danach anlegen.
+  ch "SELECT name FROM system.tables WHERE database = currentDatabase()
+      AND engine = 'Dictionary' ORDER BY name FORMAT TSV" >"$dir/dictionaries.txt"
+  while read -r tabelle; do
+    ch "SHOW CREATE DICTIONARY \`$tabelle\` FORMAT TSVRaw" >"$dir/$tabelle.dict.sql"
+  done <"$dir/dictionaries.txt"
   tar -C "$work" -cf - plausible-events | age -R "$RECIPIENTS" -o "$work/plausible-events.tar.age"
   rm -r "$dir"
 }

@@ -46,6 +46,24 @@ holen() {
   rm -r "$ziel/verschluesselt"
 }
 
+# warten CONTAINER BEFEHL…: wiederholt BEFEHL im Container, bis er klappt. Bricht ab, wenn der
+# Container nicht mehr läuft oder nach 120 Sekunden, statt endlos zu warten.
+warten() {
+  local container="$1" i
+  shift
+  for i in $(seq 120); do
+    docker exec "$container" "$@" >/dev/null 2>&1 && return 0
+    if [[ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" != true ]]; then
+      echo "FEHLER: Container $container läuft nicht mehr:" >&2
+      docker logs --tail 5 "$container" >&2 || true
+      return 1
+    fi
+    sleep 1
+  done
+  echo "FEHLER: $container nach 120 s nicht bereit" >&2
+  return 1
+}
+
 stand_waehlen() {
   local stand="${1:-$(staende | tail -1)}"
   [[ -n "$stand" ]] || { echo "Keine Backups gefunden." >&2; exit 1; }
@@ -74,9 +92,9 @@ case "${1:-}" in
     image="$(sed -n 's/^ *image: *\(postgres:[^ ]*\)$/\1/p' compose.yml | head -1)"
     docker run -d --name "$container" -e POSTGRES_PASSWORD=restore-test -e POSTGRES_DB=pipeline \
       "$image" >/dev/null
-    until docker exec "$container" pg_isready -U postgres -d pipeline >/dev/null 2>&1; do sleep 1; done
+    warten "$container" pg_isready -U postgres -d pipeline
     sleep 2 # Das Image startet Postgres nach der Ersteinrichtung einmal neu
-    until docker exec "$container" pg_isready -U postgres -d pipeline >/dev/null 2>&1; do sleep 1; done
+    warten "$container" pg_isready -U postgres -d pipeline
     docker cp "$ziel/pipeline.dump" "$container:/tmp/pipeline.dump"
     docker exec "$container" pg_restore -U postgres -d pipeline --no-owner --no-acl --exit-on-error /tmp/pipeline.dump
 
@@ -113,15 +131,28 @@ case "${1:-}" in
       tar -C "$ziel/ch" -xf "$ziel/plausible-events.tar"
       ch_image="$(sed -n 's/^ *image: *\(clickhouse\/[^ ]*\)$/\1/p' compose.yml | head -1)"
       docker run -d --name "$clickhouse" -e CLICKHOUSE_SKIP_USER_SETUP=1 "$ch_image" >/dev/null
-      until docker exec "$clickhouse" clickhouse-client -q "SELECT 1" >/dev/null 2>&1; do sleep 1; done
+      warten "$clickhouse" clickhouse-client -q "SELECT 1"
       docker exec "$clickhouse" clickhouse-client -q "CREATE DATABASE plausible_events_db"
+      pe="$ziel/ch/plausible-events"
+      anlegen() { docker exec -i "$clickhouse" clickhouse-client --database plausible_events_db <"$1"; }
+      # Reihenfolge: Tabellen ohne dictGet, dann die Dictionaries (lesen aus diesen Tabellen),
+      # dann die Tabellen, deren Spalten dictGet verwenden
+      while read -r tabelle _; do
+        if ! grep -q dictGet "$pe/$tabelle.sql"; then anlegen "$pe/$tabelle.sql"; fi
+      done <"$pe/zeilen.txt"
+      while read -r tabelle; do anlegen "$pe/$tabelle.dict.sql"; done <"$pe/dictionaries.txt"
+      while read -r tabelle _; do
+        if grep -q dictGet "$pe/$tabelle.sql"; then anlegen "$pe/$tabelle.sql"; fi
+      done <"$pe/zeilen.txt"
+
       leer=0
       while read -r tabelle erwartet; do
-        docker exec -i "$clickhouse" clickhouse-client --database plausible_events_db \
-          <"$ziel/ch/plausible-events/$tabelle.sql"
-        gunzip -c "$ziel/ch/plausible-events/$tabelle.native.gz" \
-          | docker exec -i "$clickhouse" clickhouse-client \
-            -q "INSERT INTO plausible_events_db.\`$tabelle\` FORMAT Native"
+        # Leere Tabellen: ClickHouse lehnt ein INSERT ohne Daten ab
+        if [[ -n "$(gunzip -c "$ziel/ch/plausible-events/$tabelle.native.gz" | head -c 1)" ]]; then
+          gunzip -c "$ziel/ch/plausible-events/$tabelle.native.gz" \
+            | docker exec -i "$clickhouse" clickhouse-client \
+              -q "INSERT INTO plausible_events_db.\`$tabelle\` FORMAT Native"
+        fi
         ist="$(docker exec "$clickhouse" clickhouse-client \
           -q "SELECT count() FROM plausible_events_db.\`$tabelle\`")"
         # Exakte Gleichheit ist nicht garantiert (neue Besuche, Collapsing-Merges), leer darf nichts sein
