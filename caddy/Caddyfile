@@ -61,11 +61,19 @@ vorher.tischlerei-mustermann.hschaletzky.com {
 
 sv-musterstadt.hschaletzky.com {
 	import standard
+	@plausible path /js/pa-* /api/event
+	handle @plausible {
+		reverse_proxy plausible:8000
+	}
 	reverse_proxy sv-musterstadt:80
 }
 
 physio-musterfrau.hschaletzky.com {
 	import standard
+	@plausible path /js/pa-* /api/event
+	handle @plausible {
+		reverse_proxy plausible:8000
+	}
 	reverse_proxy physio-musterfrau:80
 }
 
