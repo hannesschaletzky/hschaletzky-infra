@@ -100,9 +100,12 @@ _sichern() {
 
   status="$(bw status | jq -r .status)"
   [[ "$status" != unauthenticated ]] || { echo "Erst einmalig anmelden: bw login" >&2; exit 1; }
+  echo "Bitwarden: Kopie in den Ordner '$ordner'. Dafür jetzt das Master-Passwort von Bitwarden eingeben."
   BW_SESSION="$(bw unlock --raw)" && [[ -n "$BW_SESSION" ]] || { echo "Bitwarden ließ sich nicht entsperren." >&2; exit 1; }
   export BW_SESSION
   trap 'bw lock >/dev/null 2>&1 || true' EXIT
+  echo
+  echo "Entsperrt. Ich gleiche die Einträge ab, das dauert ein paar Sekunden je Eintrag …"
   bw sync >/dev/null
 
   ordner_id="$(bw list folders | jq -r --arg n "$ordner" '.[] | select(.name == $n) | .id')"
@@ -139,15 +142,31 @@ _sichern() {
 
 _setzen() {
   [[ -n "${1:-}" ]] || { echo "Aufruf: scripts/schluesselbund.sh setzen <eintrag>" >&2; exit 1; }
+  _schluesselbund_pruefen || exit 1
   local wert
-  read -rsp "Wert für '$1': " wert
+  [[ "$1" == hschaletzky-* ]] || echo "Hinweis: Einträge heißen sonst 'hschaletzky-<bereich>-<name>'. Abbrechen mit Strg+C."
+
+  echo "Schritt 1 von 2: Infra-Schlüsselbund"
+  echo "  Erscheint ein Fenster von macOS, will es das Passwort des Infra-Schlüsselbunds."
+  if im_schluesselbund "$1"; then
+    echo "  '$1' gibt es schon, der Wert wird ersetzt."
+  else
+    echo "  '$1' wird neu angelegt."
+  fi
+  read -rsp "  Wert einfügen und Enter drücken (die Eingabe bleibt unsichtbar): " wert
   echo
-  [[ -n "$wert" ]] || { echo "Leerer Wert, nichts geändert." >&2; exit 1; }
+  [[ -n "$wert" ]] || { echo "  Leerer Wert, nichts geändert." >&2; exit 1; }
   in_schluesselbund "$1" "$wert"
-  echo "Gespeichert: $1"
+  echo "  Gespeichert (${#wert} Zeichen)."
+  echo
+
   # Gleich nach Bitwarden kopieren, sonst vergisst man es. Als eigener Aufruf, damit dort jeder
   # Fehler abbricht (bw fehlt, falsches Master-Passwort) und hier nur der Hinweis bleibt.
-  "$0" sichern || echo "Achtung: '$1' liegt nur im Schlüsselbund. Nachholen mit: scripts/schluesselbund.sh sichern" >&2
+  echo "Schritt 2 von 2: Sicherung"
+  "$0" sichern || {
+    echo "Achtung: '$1' liegt nur im Schlüsselbund. Nachholen mit: scripts/schluesselbund.sh sichern" >&2
+    exit 1
+  }
 }
 
 # Nur beim direkten Aufruf, nicht beim Einbinden mit "."
