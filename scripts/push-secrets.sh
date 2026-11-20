@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Überträgt Secrets aus dem macOS-Schlüsselbund nach /opt/infra/secrets/ auf dem Server.
+# Überträgt Secrets aus dem Infra-Schlüsselbund (scripts/schluesselbund.sh) nach /opt/infra/secrets/ auf dem Server.
 # Läuft lokal auf dem Mac, per Admin-SSH (nicht mit dem Deploy-Schlüssel).
 #
 #   scripts/push-secrets.sh             überträgt alle Werte, bricht ab, wenn einer fehlt
@@ -7,11 +7,12 @@
 #
 # Der Schlüsselbund ist die Quelle der Wahrheit. Nach einem Server-Neuaufbau genügt ein Aufruf.
 # Nicht hier: der SSH-Schlüssel für Backups (entsteht auf dem Server, scripts/backup-ssh-key.sh).
-# GitHub-Werte von Hand anlegen (fragt nach dem Wert, landet nicht in der Shell-History):
-#   security add-generic-password -a "$USER" -s hschaletzky-auth-github-client-id -w
-#   security add-generic-password -a "$USER" -s hschaletzky-auth-github-client-secret -w
+# GitHub-Werte von Hand anlegen (fragt verdeckt nach dem Wert, landet nicht in der Shell-History):
+#   scripts/schluesselbund.sh setzen hschaletzky-auth-github-client-id
+#   scripts/schluesselbund.sh setzen hschaletzky-auth-github-client-secret
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/schluesselbund.sh
 
 ADMIN_USER="${ADMIN_USER:-hannes}"
 ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
@@ -31,14 +32,10 @@ SECRETS=(
   plausible_totp_vault_key:hschaletzky-plausible-totp-vault-key:base64
 )
 
-aus_schluesselbund() {
-  security find-generic-password -a "$USER" -s "$1" -w 2>/dev/null
-}
-
 if [[ "${1:-}" == --generate ]]; then
   for zeile in "${SECRETS[@]}"; do
     IFS=: read -r _ eintrag erzeugbar <<< "$zeile"
-    if [[ "$erzeugbar" != nein ]] && ! aus_schluesselbund "$eintrag" >/dev/null; then
+    if [[ "$erzeugbar" != nein ]] && ! im_schluesselbund "$eintrag"; then
       case "$erzeugbar" in
         # Plausible: SECRET_KEY_BASE braucht mindestens 64 Zeichen
         lang) wert="$(openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c 64)" ;;
@@ -47,7 +44,7 @@ if [[ "${1:-}" == --generate ]]; then
         # 32 Zeichen ohne Sonderzeichen: unproblematisch in URLs und Shells
         *) wert="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)" ;;
       esac
-      security add-generic-password -a "$USER" -s "$eintrag" -w "$wert"
+      in_schluesselbund "$eintrag" "$wert"
       echo "Erzeugt: $eintrag"
     fi
   done
@@ -60,11 +57,7 @@ ssh_admin "sudo install -d -m 700 -o deploy -g deploy $ZIEL"
 
 for zeile in "${SECRETS[@]}"; do
   IFS=: read -r datei eintrag _ <<< "$zeile"
-  wert="$(aus_schluesselbund "$eintrag")" || {
-    echo "Kein Eintrag '$eintrag' im Schlüsselbund. Anlegen mit:" >&2
-    echo "  security add-generic-password -a \"\$USER\" -s $eintrag -w" >&2
-    exit 1
-  }
+  wert="$(aus_schluesselbund "$eintrag")"
   # 0444: Container lesen die Datei als eigener Nutzer (postgres, node). Geschützt ist sie
   # durch das Verzeichnis (0700, deploy), das nur in die Container eingehängt wird.
   printf %s "$wert" | ssh_admin "sudo sh -c 'umask 077; cat > $ZIEL/$datei.neu && chown deploy:deploy $ZIEL/$datei.neu && chmod 444 $ZIEL/$datei.neu && mv $ZIEL/$datei.neu $ZIEL/$datei'"

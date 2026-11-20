@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Backups von der Storage Box holen und entschlüsseln. Läuft lokal auf dem Mac, denn nur hier
-# liegt der private age-Schlüssel (Schlüsselbund: hschaletzky-backup-age).
+# liegt der private age-Schlüssel (Infra-Schlüsselbund: hschaletzky-backup-age).
 #
 #   scripts/backup-restore.sh list            vorhandene Stände
 #   scripts/backup-restore.sh fetch [STAND]   holt und entschlüsselt einen Stand (Standard: neuester)
@@ -11,6 +11,7 @@
 # Snapshots älterer Tage: auf der Box unter .zfs/snapshot/<name>/backups/daily/ (nur lesen).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/schluesselbund.sh
 
 ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
 AGE_EINTRAG=hschaletzky-backup-age
@@ -29,10 +30,7 @@ staende() {
 }
 
 age_schluessel() {
-  security find-generic-password -a "$USER" -s "$AGE_EINTRAG" -w 2>/dev/null || {
-    echo "Kein Eintrag '$AGE_EINTRAG' im Schlüsselbund (privater age-Schlüssel, siehe Passwortmanager)." >&2
-    exit 1
-  }
+  aus_schluesselbund "$AGE_EINTRAG"
 }
 
 # holen STAND ZIEL: lädt alle Dateien und entschlüsselt sie nach ZIEL

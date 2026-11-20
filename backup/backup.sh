@@ -6,7 +6,7 @@
 #   backup now        sichert sofort einmal (Test: docker compose run --rm backup now)
 #
 # Der Server kennt nur den öffentlichen age-Schlüssel: Er kann seine Backups schreiben, aber
-# nicht lesen. Der private Schlüssel liegt nur im Passwortmanager und im Schlüsselbund am Mac.
+# nicht lesen. Der private Schlüssel liegt nur im Passwortmanager und im Infra-Schlüsselbund am Mac.
 # Klartext entsteht nur in /tmp, und das ist ein tmpfs (RAM).
 set -euo pipefail
 

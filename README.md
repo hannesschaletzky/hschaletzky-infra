@@ -26,21 +26,21 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
             └──────────── GitHub Actions (pro Website-Repo) ──────┘
 ```
 
-| Datei                     | Zweck                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `tofu/server.tf`          | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key    |
-| `tofu/dns.tf`             | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                             |
-| `tofu/dns-fraktion-braeune.tf` | Zone `fraktion-braeune.de` (Spaßprojekt, Mail weiter bei Strato)          |
-| `tofu/uptime.tf`          | Externe Erreichbarkeit: 7 Monitore bei UptimeRobot, Alarm per Pushover und E-Mail |
-| `tofu/cloud-init.yaml`    | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban |
-| `tofu/terraform.tfstate`  | State, mit AES-GCM verschlüsselt                                                |
-| `compose.yml`             | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                        |
-| `caddy/Caddyfile`         | Domains → Container, Zertifikate automatisch via Let's Encrypt                  |
-| `scripts/deploy.sh`       | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf, mit Rechtetabelle pro Repo |
-| `scripts/deploy-keys.sh`  | Deploy-Schlüssel pro Repo erzeugen, auf den Server bringen, als GitHub-Secret setzen |
-| `tofu/keys/deploy/`       | Öffentliche Deploy-Schlüssel, einer pro Repo (`<repo>.pub`)                     |
-| `scripts/push-secrets.sh` | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)        |
-| `previews/`               | Blog-Previews pro Branch, nur auf dem Server (gitignored, angelegt von deploy.sh) |
+| Datei                          | Zweck                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `tofu/server.tf`               | Server, feste IPv4/IPv6, Cloud-Firewall (22, 80, 443 TCP/UDP), Admin-SSH-Key                  |
+| `tofu/dns.tf`                  | Zone `hschaletzky.com` inklusive Microsoft-365-Mail                                           |
+| `tofu/dns-fraktion-braeune.tf` | Zone `fraktion-braeune.de` (Spaßprojekt, Mail weiter bei Strato)                              |
+| `tofu/uptime.tf`               | Externe Erreichbarkeit: 7 Monitore bei UptimeRobot, Alarm per Pushover und E-Mail             |
+| `tofu/cloud-init.yaml`         | Einrichtung beim ersten Start: Updates, Docker, Benutzer, SSH-Härtung, fail2ban               |
+| `tofu/terraform.tfstate`       | State, mit AES-GCM verschlüsselt                                                              |
+| `compose.yml`                  | Alle Dienste. Eine neue Website = ein neuer Eintrag hier                                      |
+| `caddy/Caddyfile`              | Domains → Container, Zertifikate automatisch via Let's Encrypt                                |
+| `scripts/deploy.sh`            | Einziger Befehl, den GitHub Actions auf dem Server ausführen darf, mit Rechtetabelle pro Repo |
+| `scripts/deploy-keys.sh`       | Deploy-Schlüssel pro Repo erzeugen, auf den Server bringen, als GitHub-Secret setzen          |
+| `tofu/keys/deploy/`            | Öffentliche Deploy-Schlüssel, einer pro Repo (`<repo>.pub`)                                   |
+| `scripts/push-secrets.sh`      | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)                      |
+| `previews/`                    | Blog-Previews pro Branch, nur auf dem Server (gitignored, angelegt von deploy.sh)             |
 
 ## Prinzip
 
@@ -78,12 +78,14 @@ Deploy-Schlüssel entstehen pro Repo mit `scripts/deploy-keys.sh` (siehe 5.), so
 
 ### 3. Anlegen
 
-Token und Passphrase einmalig in den macOS-Schlüsselbund legen. `-w` ohne Wert fragt danach, so landet nichts in der
-Shell-History:
+Den Infra-Schlüsselbund anlegen und Token und Passphrase einmalig hineinlegen (siehe [Secrets](#secrets)).
+`setzen` fragt verdeckt nach dem Wert, so landet nichts in der Shell-History:
 
 ```sh
-security add-generic-password -a "$USER" -s hschaletzky-hcloud-token -w
-security add-generic-password -a "$USER" -s hschaletzky-tofu-passphrase -w
+scripts/schluesselbund.sh einrichten
+scripts/schluesselbund.sh setzen hschaletzky-hcloud-token
+scripts/schluesselbund.sh setzen hschaletzky-tofu-passphrase
+scripts/schluesselbund.sh setzen hschaletzky-uptimerobot-api-key
 ```
 
 `tofu/run.sh` liest beide beim Aufruf aus und reicht alle Argumente an `tofu` weiter:
@@ -106,11 +108,11 @@ weiterhin auf Vercel. Prüfen: `dig +short NS hschaletzky.com` und `dig +short M
 
 In **jedem** Website-Repo und in diesem Repo: Environment `production` mit den Secrets
 
-| Secret               | Inhalt                                              |
-| -------------------- | --------------------------------------------------- |
-| `DEPLOY_HOST`        | `tofu output -raw ipv4`                             |
-| `DEPLOY_SSH_KEY`     | `scripts/deploy-keys.sh neu <repo> production`      |
-| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`         |
+| Secret               | Inhalt                                         |
+| -------------------- | ---------------------------------------------- |
+| `DEPLOY_HOST`        | `tofu output -raw ipv4`                        |
+| `DEPLOY_SSH_KEY`     | `scripts/deploy-keys.sh neu <repo> production` |
+| `DEPLOY_KNOWN_HOSTS` | Ausgabe von `ssh-keyscan -t ed25519 <ipv4>`    |
 
 `deploy-keys.sh neu` erzeugt den Schlüssel, trägt ihn auf dem Server ein, testet ihn, setzt das Secret und
 löscht den privaten Teil lokal. Danach `tofu/keys/deploy/<repo>.pub` committen und für ein neues Repo die
@@ -162,7 +164,21 @@ Dienste mit Zugangsdaten bekommen sie als **Compose-Secrets**: Dateien unter `/o
 `*_FILE`-Variablen. Sie tauchen damit weder in `docker inspect` noch in der Prozessumgebung auf,
 und jeder Container sieht nur seine eigenen.
 
-Quelle der Wahrheit ist der macOS-Schlüsselbund. `scripts/push-secrets.sh` überträgt alle Werte per
+Quelle der Wahrheit ist ein **eigener macOS-Schlüsselbund** nur für diese Infrastruktur
+(`~/Library/Keychains/hschaletzky-infra.keychain-db`, verwaltet mit `scripts/schluesselbund.sh`).
+Er hat ein eigenes Passwort und sperrt sich nach 5 Minuten ohne Zugriff und beim Ruhezustand; macOS
+fragt dann beim nächsten Zugriff nach dem Passwort. Der Anmelde-Schlüsselbund wäre dagegen offen,
+solange man angemeldet ist, und jedes Programm unter dem eigenen Nutzer könnte still mitlesen. Das
+Passwort des Schlüsselbunds und eine Kopie jedes Werts liegen im Passwortmanager.
+
+| Befehl                                       | Wirkung                              |
+| -------------------------------------------- | ------------------------------------ |
+| `scripts/schluesselbund.sh einrichten`       | Schlüsselbund anlegen, Sperre setzen |
+| `scripts/schluesselbund.sh setzen <eintrag>` | Wert anlegen oder ersetzen           |
+| `scripts/schluesselbund.sh liste`            | Namen der Einträge, keine Werte      |
+| `scripts/schluesselbund.sh sperren`          | sofort sperren                       |
+
+`scripts/push-secrets.sh` überträgt alle Werte per
 Admin-SSH, mit `--generate` erzeugt es fehlende Datenbank-Passwörter vorher. Nach einem
 Server-Neuaufbau genügt ein Aufruf. Der Deploy-Schlüssel hat mit Secrets nichts zu tun.
 
@@ -236,7 +252,7 @@ Der Dienst `backup` ([backup/](backup/)) sichert täglich um 03:00 UTC:
 
 Alles wird mit [age](https://age-encryption.org) für einen **öffentlichen** Schlüssel verschlüsselt
 ([backup/age-recipients.txt](backup/age-recipients.txt)): Der Server kann seine Backups schreiben,
-aber nicht lesen. Der private Schlüssel liegt nur im Passwortmanager und im macOS-Schlüsselbund
+aber nicht lesen. Der private Schlüssel liegt nur im Passwortmanager und im Infra-Schlüsselbund
 (`hschaletzky-backup-age`). Klartext entsteht nur im RAM (tmpfs).
 
 Ziel ist eine Hetzner Storage Box in fsn1, also nicht im Rechenzentrum des Servers
@@ -269,7 +285,7 @@ Volume kopieren (Eigentümer 1000), `-wal`/`-shm` daneben löschen, App starten.
 ### Ersteinrichtung
 
 1. `tofu/run.sh apply` (Storage Box, Unterkonto, Snapshot-Plan)
-2. age-Schlüssel erzeugen: privater Teil in Passwortmanager und Schlüsselbund
+2. age-Schlüssel erzeugen: privater Teil in Passwortmanager und Infra-Schlüsselbund
    (`hschaletzky-backup-age`), öffentlicher Teil nach `backup/age-recipients.txt`
 3. `scripts/push-secrets.sh --generate` (Passwort der Backup-Rolle)
 4. `scripts/backup-ssh-key.sh` (Schlüssel auf dem Server erzeugen, beim Unterkonto hinterlegen)
