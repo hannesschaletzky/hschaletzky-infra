@@ -13,14 +13,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/schluesselbund.sh
 
-ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
+. scripts/admin-ssh.sh
 AGE_EINTRAG=hschaletzky-backup-age
 
 box="$(tofu/run.sh output -raw storage_box_host)"
 box_user="$(tofu/run.sh output -raw storage_box_user)"
 
 sftp_batch() {
-  sftp -P 23 -i "$ADMIN_KEY" -b - -o StrictHostKeyChecking=yes \
+  sftp -P 23 "${ADMIN_SSH[@]}" -b - -o StrictHostKeyChecking=yes \
     -o UserKnownHostsFile=backup/known_hosts "$box_user@$box"
 }
 

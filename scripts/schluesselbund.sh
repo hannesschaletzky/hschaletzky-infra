@@ -16,13 +16,18 @@
 
 SCHLUESSELBUND="${SCHLUESSELBUND:-$HOME/Library/Keychains/hschaletzky-infra.keychain-db}"
 SCHLUESSELBUND_SPERRE_SEKUNDEN=300
+_GESPERRT="Der Infra-Schlüsselbund blieb gesperrt: Im Fenster von macOS sein Passwort eingeben (nicht das Anmeldepasswort)."
 
-# _wert_lesen EINTRAG SCHLÜSSELBUND: gibt den Wert aus, Status 1, wenn es den Eintrag nicht gibt.
+# _wert_lesen EINTRAG SCHLÜSSELBUND: gibt den Wert aus. Status 1, wenn es den Eintrag nicht gibt,
+# Status 2, wenn der Schlüsselbund gesperrt blieb (Passwortfenster abgebrochen, falsches Passwort).
 # Mit -g statt -w, weil nur so eindeutig ist, ob security den Wert als Hex ausgibt (bei Zeichen
 # außerhalb von ASCII: ä, ß, €) oder im Klartext.
 _wert_lesen() {
-  local zeile
-  zeile="$(security find-generic-password -a "$USER" -s "$1" -g "$2" 2>&1 >/dev/null | grep '^password: ')" || return 1
+  local ausgabe zeile status=0
+  ausgabe="$(security find-generic-password -a "$USER" -s "$1" -g "$2" 2>&1 >/dev/null)" || status=$?
+  # 44 heißt bei security: Eintrag nicht gefunden
+  [[ "$status" -eq 0 ]] || { [[ "$status" -eq 44 ]] && return 1 || return 2; }
+  zeile="$(grep '^password: ' <<< "$ausgabe")" || return 1
   zeile="${zeile#password: }"
   if [[ "$zeile" == 0x* ]]; then
     zeile="${zeile#0x}"
@@ -52,16 +57,24 @@ _schluesselbund_pruefen() {
 # aus_schluesselbund EINTRAG: gibt den Wert aus. Fehlt der Eintrag, kommt ein Hinweis und Status 1.
 aus_schluesselbund() {
   _schluesselbund_pruefen || return 1
-  _wert_lesen "$1" "$SCHLUESSELBUND" || {
-    echo "Kein Eintrag '$1' im Schlüsselbund. Anlegen mit: scripts/schluesselbund.sh setzen $1" >&2
-    return 1
-  }
+  local status=0
+  _wert_lesen "$1" "$SCHLUESSELBUND" || status=$?
+  case "$status" in
+    0) ;;
+    1) echo "Kein Eintrag '$1' im Schlüsselbund. Anlegen mit: scripts/schluesselbund.sh setzen $1" >&2 ;;
+    *) echo "$_GESPERRT" >&2 ;;
+  esac
+  return "$status"
 }
 
 # im_schluesselbund EINTRAG: Status 0, wenn es den Eintrag gibt. Gibt nichts aus.
 im_schluesselbund() {
   _schluesselbund_pruefen || return 1
-  _wert_lesen "$1" "$SCHLUESSELBUND" >/dev/null
+  local status=0
+  _wert_lesen "$1" "$SCHLUESSELBUND" >/dev/null || status=$?
+  # Gesperrt ist nicht "fehlt": Sonst würde ein Aufrufer einen vorhandenen Wert neu erzeugen und überschreiben
+  [[ "$status" -le 1 ]] || { echo "$_GESPERRT" >&2; exit 1; }
+  return "$status"
 }
 
 # in_schluesselbund EINTRAG WERT: legt den Eintrag an oder ersetzt ihn.

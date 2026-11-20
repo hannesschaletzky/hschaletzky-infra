@@ -14,8 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/schluesselbund.sh
 
-ADMIN_USER="${ADMIN_USER:-hannes}"
-ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
+. scripts/admin-ssh.sh
 ZIEL=/opt/infra/secrets
 
 # "Datei auf dem Server:Eintrag im Schlüsselbund:erzeugbar (ja, lang, base64 oder nein)" (macOS-Bash 3.2 kennt keine Hash-Arrays)
@@ -58,7 +57,7 @@ if [[ "${1:-}" == --generate ]]; then
 fi
 
 host="${SERVER:-$(tofu/run.sh output -raw ipv4)}"
-ssh_admin() { ssh -i "$ADMIN_KEY" "$ADMIN_USER@$host" "$@"; }
+ssh_admin() { ssh "${ADMIN_SSH[@]}" "$ADMIN_USER@$host" "$@"; }
 
 ssh_admin "sudo install -d -m 700 -o deploy -g deploy $ZIEL"
 

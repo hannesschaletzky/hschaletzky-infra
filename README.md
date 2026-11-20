@@ -40,6 +40,7 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 | `scripts/deploy-keys.sh`       | Deploy-Schlüssel pro Repo erzeugen, auf den Server bringen, als GitHub-Secret setzen          |
 | `tofu/keys/deploy/`            | Öffentliche Deploy-Schlüssel, einer pro Repo (`<repo>.pub`)                                   |
 | `scripts/push-secrets.sh`      | Secrets aus dem Schlüsselbund nach `/opt/infra/secrets/` (per Admin-SSH)                      |
+| `scripts/admin-ssh.sh`         | Admin-SSH der lokalen Skripte über den Bitwarden-SSH-Agent                                    |
 | `previews/`                    | Blog-Previews pro Branch, nur auf dem Server (gitignored, angelegt von deploy.sh)             |
 
 ## Prinzip
@@ -68,9 +69,22 @@ Alles, was bei Hetzner läuft, als Code: Server, Firewall und DNS mit OpenTofu, 
 
 ### 2. Schlüssel
 
-```sh
-ssh-keygen -t ed25519 -f ~/.ssh/hschaletzky_com_hetzner -C "admin@hschaletzky-infra"         # mit Passphrase
-cp ~/.ssh/hschaletzky_com_hetzner.pub tofu/keys/admin.pub
+Der Admin-Schlüssel entsteht in der Bitwarden-App und bleibt dort: neuer Eintrag vom Typ
+„SSH-Schlüssel“ (ED25519) mit dem Namen `hschaletzky-ssh-admin` im Ordner `fl_hschaletzky`. In den
+Einstellungen „SSH-Agent aktivieren“ einschalten und die Autorisierung auf „Immer“ stellen: Der
+private Teil liegt so nie als Datei auf der Platte, und jede Benutzung braucht eine Bestätigung.
+Den öffentlichen Teil aus dem Eintrag nach `tofu/keys/admin.pub` kopieren.
+
+Die lokalen Skripte binden `scripts/admin-ssh.sh` ein und melden sich darüber am Agent an. Für den
+Login von Hand in `~/.ssh/config`:
+
+```
+Host hschaletzky_com
+  HostName <ipv4>
+  User hannes
+  IdentityFile <Pfad zum Repo>/tofu/keys/admin.pub
+  IdentityAgent ~/.bitwarden-ssh-agent.sock
+  IdentitiesOnly yes
 ```
 
 Deploy-Schlüssel entstehen pro Repo mit `scripts/deploy-keys.sh` (siehe 5.), sobald der Server läuft. Die
@@ -96,7 +110,7 @@ tofu/run.sh apply
 git add . && git commit -m "Infrastruktur angelegt" && git push
 ```
 
-cloud-init braucht danach etwa drei Minuten. Login: `ssh -i ~/.ssh/hschaletzky_com_hetzner hannes@<ipv4>`.
+cloud-init braucht danach etwa drei Minuten. Login: `ssh hschaletzky_com`.
 
 ### 4. Nameserver bei Strato
 

@@ -10,8 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ADMIN_USER="${ADMIN_USER:-hannes}"
-ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
+. scripts/admin-ssh.sh
 DATEI=/opt/infra/secrets/backup_ssh_key
 
 host="${SERVER:-$(tofu/run.sh output -raw ipv4)}"
@@ -19,7 +18,7 @@ box="$(tofu/run.sh output -raw storage_box_host)"
 box_user="$(tofu/run.sh output -raw storage_box_user)"
 
 # 0444 im Verzeichnis 0700 (deploy) wie die übrigen Secrets: Der Container liest als uid 1000.
-oeffentlich="$(ssh -i "$ADMIN_KEY" "$ADMIN_USER@$host" "sudo sh -c '
+oeffentlich="$(ssh "${ADMIN_SSH[@]}" "$ADMIN_USER@$host" "sudo sh -c '
   set -e
   install -d -m 700 -o deploy -g deploy /opt/infra/secrets
   if [ ! -f $DATEI ]; then
@@ -35,7 +34,7 @@ tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 printf '%s\n' "$oeffentlich" >"$tmp"
 
-sftp -P 23 -i "$ADMIN_KEY" -b - -o StrictHostKeyChecking=yes \
+sftp -P 23 "${ADMIN_SSH[@]}" -b - -o StrictHostKeyChecking=yes \
   -o UserKnownHostsFile=backup/known_hosts "$box_user@$box" >/dev/null <<EOF
 -mkdir backups/.ssh
 put $tmp backups/.ssh/authorized_keys

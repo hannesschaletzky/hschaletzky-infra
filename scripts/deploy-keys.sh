@@ -18,8 +18,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 OWNER=hannesschaletzky
-ADMIN_USER="${ADMIN_USER:-hannes}"
-ADMIN_KEY="${ADMIN_KEY:-$HOME/.ssh/hschaletzky_com_hetzner}"
+. scripts/admin-ssh.sh
 KEYS=tofu/keys/deploy
 host="${SERVER:-$(tofu/run.sh output -raw ipv4)}"
 
@@ -32,7 +31,7 @@ authorized_keys() {
 
 installieren() {
   # Erst vollständig schreiben, dann umbenennen: Ein abgebrochener Upload sperrt keine Deploys aus
-  authorized_keys | ssh -i "$ADMIN_KEY" "$ADMIN_USER@$host" '
+  authorized_keys | ssh "${ADMIN_SSH[@]}" "$ADMIN_USER@$host" '
     set -e
     d=/home/deploy/.ssh
     sudo install -d -m 700 -o deploy -g deploy $d
