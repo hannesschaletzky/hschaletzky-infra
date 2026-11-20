@@ -3,7 +3,7 @@
 # Läuft lokal auf dem Mac, per Admin-SSH (nicht mit dem Deploy-Schlüssel).
 #
 #   scripts/push-secrets.sh             überträgt alle Werte, bricht ab, wenn einer fehlt
-#   scripts/push-secrets.sh --generate  erzeugt fehlende Datenbank-Passwörter vorher
+#   scripts/push-secrets.sh --generate  erzeugt fehlende Datenbank-Passwörter vorher und sichert sie nach Bitwarden
 #
 # Der Schlüsselbund ist die Quelle der Wahrheit. Nach einem Server-Neuaufbau genügt ein Aufruf.
 # Nicht hier: der SSH-Schlüssel für Backups (entsteht auf dem Server, scripts/backup-ssh-key.sh).
@@ -33,6 +33,7 @@ SECRETS=(
 )
 
 if [[ "${1:-}" == --generate ]]; then
+  erzeugt=0
   for zeile in "${SECRETS[@]}"; do
     IFS=: read -r _ eintrag erzeugbar <<< "$zeile"
     if [[ "$erzeugbar" != nein ]] && ! im_schluesselbund "$eintrag"; then
@@ -46,8 +47,14 @@ if [[ "${1:-}" == --generate ]]; then
       esac
       in_schluesselbund "$eintrag" "$wert"
       echo "Erzeugt: $eintrag"
+      erzeugt=1
     fi
   done
+  # Neue Werte gleich nach Bitwarden kopieren, sonst gibt es sie nur im Schlüsselbund und auf dem Server
+  if [[ "$erzeugt" == 1 ]]; then
+    scripts/schluesselbund.sh sichern \
+      || echo "Achtung: Die neuen Werte liegen nur im Schlüsselbund. Nachholen mit: scripts/schluesselbund.sh sichern" >&2
+  fi
 fi
 
 host="${SERVER:-$(tofu/run.sh output -raw ipv4)}"

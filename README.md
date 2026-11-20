@@ -169,14 +169,21 @@ Quelle der Wahrheit ist ein **eigener macOS-Schlüsselbund** nur für diese Infr
 Er hat ein eigenes Passwort und sperrt sich nach 5 Minuten ohne Zugriff und beim Ruhezustand; macOS
 fragt dann beim nächsten Zugriff nach dem Passwort. Der Anmelde-Schlüsselbund wäre dagegen offen,
 solange man angemeldet ist, und jedes Programm unter dem eigenen Nutzer könnte still mitlesen. Das
-Passwort des Schlüsselbunds und eine Kopie jedes Werts liegen im Passwortmanager.
+Passwort des Schlüsselbunds und eine Kopie jedes Werts liegen im Passwortmanager; die Kopien legt
+`sichern` an und hält sie aktuell.
 
-| Befehl                                       | Wirkung                              |
-| -------------------------------------------- | ------------------------------------ |
-| `scripts/schluesselbund.sh einrichten`       | Schlüsselbund anlegen, Sperre setzen |
-| `scripts/schluesselbund.sh setzen <eintrag>` | Wert anlegen oder ersetzen           |
-| `scripts/schluesselbund.sh liste`            | Namen der Einträge, keine Werte      |
-| `scripts/schluesselbund.sh sperren`          | sofort sperren                       |
+**Neues Secret:** `scripts/schluesselbund.sh setzen hschaletzky-<name>` legt den Wert an und kopiert
+ihn gleich nach Bitwarden (fragt nach dem Master-Passwort). Dasselbe macht `push-secrets.sh --generate`
+für Passwörter, die es selbst erzeugt. Schlägt die Kopie fehl, bleibt der Wert im Schlüsselbund und
+ein Hinweis nennt den Befehl zum Nachholen.
+
+| Befehl                                       | Wirkung                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `scripts/schluesselbund.sh einrichten`       | Schlüsselbund anlegen, Sperre setzen                                                   |
+| `scripts/schluesselbund.sh setzen <eintrag>` | Wert anlegen oder ersetzen, danach automatisch `sichern`                               |
+| `scripts/schluesselbund.sh liste`            | Namen der Einträge, keine Werte                                                        |
+| `scripts/schluesselbund.sh sperren`          | sofort sperren                                                                         |
+| `scripts/schluesselbund.sh sichern`          | alle Einträge nach Bitwarden kopieren (Ordner `fl_hschaletzky`, braucht `bw` und `jq`) |
 
 `scripts/push-secrets.sh` überträgt alle Werte per
 Admin-SSH, mit `--generate` erzeugt es fehlende Datenbank-Passwörter vorher. Nach einem

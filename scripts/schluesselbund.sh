@@ -5,9 +5,10 @@
 # Programm unter dem eigenen Nutzer könnte die Einträge dort ohne Rückfrage lesen.
 #
 #   scripts/schluesselbund.sh einrichten        legt den Schlüsselbund an (fragt nach einem neuen Passwort)
-#   scripts/schluesselbund.sh setzen <eintrag>  legt einen Wert an oder ersetzt ihn (fragt verdeckt danach)
+#   scripts/schluesselbund.sh setzen <eintrag>  legt einen Wert an oder ersetzt ihn (fragt verdeckt danach), dann sichern
 #   scripts/schluesselbund.sh liste             zeigt die Namen der Einträge, keine Werte
 #   scripts/schluesselbund.sh sperren           sperrt sofort
+#   scripts/schluesselbund.sh sichern           kopiert alle Einträge nach Bitwarden (Ordner fl_hschaletzky)
 #
 # Ist der Schlüsselbund gesperrt, fragt macOS beim nächsten Zugriff in einem Fenster nach dem Passwort.
 # Die anderen Skripte binden diese Datei ein (". scripts/schluesselbund.sh") und nutzen
@@ -86,6 +87,56 @@ _namen() {
   security dump-keychain "$1" | sed -n 's/^ *"svce"<blob>="\(.*\)"$/\1/p' | sort -u
 }
 
+# Sicherung in Bitwarden: je Eintrag ein Login mit demselben Namen, der Wert steht im Passwortfeld
+# (so führt Bitwarden beim Tauschen eine Historie). Vorhandene Einträge werden nur angefasst, wenn
+# sich der Wert geändert hat; Notizen und alles andere bleiben. Braucht bw (brew install
+# bitwarden-cli), jq und einmalig "bw login". Im eigenen Terminal starten: Solange bw entsperrt
+# ist, ist der ganze Tresor offen. Am Ende wird bw wieder gesperrt.
+_sichern() {
+  _schluesselbund_pruefen || exit 1
+  local ordner="${BW_ORDNER:-fl_hschaletzky}" status ordner_id eintraege eintrag wert id
+  local neu=0 geaendert=0 gleich=0
+  command -v bw >/dev/null && command -v jq >/dev/null || { echo "Es fehlen bw oder jq: brew install bitwarden-cli jq" >&2; exit 1; }
+
+  status="$(bw status | jq -r .status)"
+  [[ "$status" != unauthenticated ]] || { echo "Erst einmalig anmelden: bw login" >&2; exit 1; }
+  BW_SESSION="$(bw unlock --raw)" && [[ -n "$BW_SESSION" ]] || { echo "Bitwarden ließ sich nicht entsperren." >&2; exit 1; }
+  export BW_SESSION
+  trap 'bw lock >/dev/null 2>&1 || true' EXIT
+  bw sync >/dev/null
+
+  ordner_id="$(bw list folders | jq -r --arg n "$ordner" '.[] | select(.name == $n) | .id')"
+  [[ -n "$ordner_id" ]] || { echo "Den Ordner '$ordner' gibt es in Bitwarden nicht." >&2; exit 1; }
+  eintraege="$(_namen "$SCHLUESSELBUND")"
+  [[ -n "$eintraege" ]] || { echo "Der Schlüsselbund ist leer." >&2; exit 1; }
+
+  # Die Liste kommt über Kanal 3, damit bw in der Schleife nicht die Standardeingabe leer liest
+  while IFS= read -r eintrag <&3; do
+    wert="$(_wert_lesen "$eintrag" "$SCHLUESSELBUND")" || { echo "Übersprungen (nicht lesbar): $eintrag" >&2; continue; }
+    id="$(bw list items --folderid "$ordner_id" --search "$eintrag" </dev/null | jq -r --arg n "$eintrag" '[.[] | select(.name == $n)][0].id // empty')"
+    # Der Wert geht immer über die Standardeingabe an jq, nie als Argument (Prozessliste)
+    if [[ -z "$id" ]]; then
+      printf %s "$wert" | jq -Rs --slurpfile vorlage <(bw get template item </dev/null) --arg n "$eintrag" --arg o "$ordner_id" \
+        '$vorlage[0] + {type: 1, name: $n, folderId: $o, favorite: false, fields: [], secureNote: null, card: null, identity: null,
+          notes: "Kopie aus dem Infra-Schlüsselbund (hschaletzky-infra, scripts/schluesselbund.sh sichern).",
+          login: {username: null, password: ., totp: null, uris: []}}' \
+        | bw encode | bw create item >/dev/null
+      echo "Neu: $eintrag"
+      neu=$((neu + 1))
+    else
+      if printf %s "$wert" | jq -Rse --slurpfile alt <(bw get item "$id" </dev/null) '$alt[0].login.password == .' >/dev/null; then
+        gleich=$((gleich + 1))
+      else
+        printf %s "$wert" | jq -Rs --slurpfile alt <(bw get item "$id" </dev/null) '. as $w | $alt[0] | .login.password = $w' \
+          | bw encode | bw edit item "$id" >/dev/null
+        echo "Geändert: $eintrag"
+        geaendert=$((geaendert + 1))
+      fi
+    fi
+  done 3<<< "$eintraege"
+  echo "Fertig: $neu neu, $geaendert geändert, $gleich unverändert. Bitwarden ist wieder gesperrt."
+}
+
 _setzen() {
   [[ -n "${1:-}" ]] || { echo "Aufruf: scripts/schluesselbund.sh setzen <eintrag>" >&2; exit 1; }
   local wert
@@ -94,6 +145,9 @@ _setzen() {
   [[ -n "$wert" ]] || { echo "Leerer Wert, nichts geändert." >&2; exit 1; }
   in_schluesselbund "$1" "$wert"
   echo "Gespeichert: $1"
+  # Gleich nach Bitwarden kopieren, sonst vergisst man es. Als eigener Aufruf, damit dort jeder
+  # Fehler abbricht (bw fehlt, falsches Master-Passwort) und hier nur der Hinweis bleibt.
+  "$0" sichern || echo "Achtung: '$1' liegt nur im Schlüsselbund. Nachholen mit: scripts/schluesselbund.sh sichern" >&2
 }
 
 # Nur beim direkten Aufruf, nicht beim Einbinden mit "."
@@ -104,6 +158,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     setzen) _setzen "${2:-}" ;;
     liste) _schluesselbund_pruefen && _namen "$SCHLUESSELBUND" ;;
     sperren) security lock-keychain "$SCHLUESSELBUND" ;;
-    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
+    sichern) _sichern ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
   esac
 fi
