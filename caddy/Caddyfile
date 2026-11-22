@@ -154,16 +154,13 @@ blog.hschaletzky.com {
 # Fraktion Bräune, Repo fraktion_braeune (eigene Domain, Zone in tofu/dns-fraktion-braeune.tf)
 fraktion-braeune.de {
 	import standard
-	# WARTUNGSMODUS (seit 2026-11-22): Neubau läuft lokal, online nur diese Seite.
-	# Wieder live schalten: die Zeilen bis "Ende Wartungsmodus" löschen und reverse_proxy wieder aktivieren.
-	header Content-Type "text/html; charset=utf-8"
-	header Retry-After "86400"
-	header Cache-Control "no-store"
-	respond 503 {
-		body `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Fraktion Bräune – gleich wieder da</title><style>html,body{height:100%;margin:0}body{display:grid;place-content:center;gap:18px;padding:24px;background:#140d16;color:#f8f2e7;font:18px/1.5 system-ui,sans-serif;text-align:center}h1{margin:0;font:800 clamp(2.2rem,8vw,4rem)/1 Impact,'Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:.02em}h1 span{color:#ffd23f}p{margin:0;max-width:34ch}a{display:inline-block;margin-top:8px;padding:.6em 1.2em;border-radius:999px;border:3px solid #1a1218;background:#ffd23f;color:#1a1218;font-weight:800;text-decoration:none;box-shadow:4px 4px 0 #1a1218}</style></head><body><h1>Fraktion <span>Bräune</span></h1><p>Wir bauen gerade um – die neue Seite kommt bald. Bis dahin findet ihr uns im Block und auf Instagram.</p><a href="https://www.instagram.com/fraktion_braeune/">@fraktion_braeune</a></body></html>`
+	# PASSWORTSCHUTZ (seit 2026-11-22): Seite nur für Eingeladene, Benutzer „fraktion“.
+	# Hash erzeugen: caddy hash-password  (oder htpasswd -nbB fraktion <passwort>). Wieder öffentlich: Block löschen.
+	basic_auth {
+		fraktion $2b$12$FfJQI/8KNV3hSwMxuud9Ye.tsfo4JtZeMCbgI5inT/gulnosHM.k6
 	}
-	# Ende Wartungsmodus
-	# reverse_proxy fraktion-braeune:80
+	header X-Robots-Tag "noindex, nofollow"
+	reverse_proxy fraktion-braeune:80
 }
 
 www.fraktion-braeune.de {
