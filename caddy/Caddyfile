@@ -162,7 +162,20 @@ fraktion-braeune.de {
 		reverse_proxy plausible:8000
 	}
 	# Ohne Passwort: Plausible sowie die Favicons (damit Plausible & Co. das Icon anzeigen können)
-	@geschuetzt not path /js/pa-* /api/event /favicon.ico /favicon-32.png /apple-touch-icon.png /icon-192.png /icon-512.png
+	# Link-Vorschau (WhatsApp, Telegram, iMessage …): Vorschau-Dienste bekommen nur Titel, Text und Bild,
+	# nicht die Seite selbst. Solange der Passwortschutz gilt.
+	@vorschaudienst {
+		not path /vorschau.jpg
+		header_regexp User-Agent (?i)(whatsapp|facebookexternalhit|facebookcatalog|telegrambot|twitterbot|slackbot|discordbot|linkedinbot|skypeuripreview|applebot|iMessage|signal)
+	}
+	handle @vorschaudienst {
+		header Content-Type "text/html; charset=utf-8"
+		respond `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Fraktion Bräune – Europas lauteste Beachvolleyball-Fans</title><meta name="description" content="Wir sind Fraktion Bräune, die Beachvolleyball-Fangruppe aus Berlin auf der German Beach Tour: Fahnen, Choreos, Pyro und gute Laune."><meta property="og:type" content="website"><meta property="og:site_name" content="Fraktion Bräune"><meta property="og:title" content="Fraktion Bräune – Europas lauteste Beachvolleyball-Fans"><meta property="og:description" content="Wir sind Fraktion Bräune, die Beachvolleyball-Fangruppe aus Berlin auf der German Beach Tour: Fahnen, Choreos, Pyro und gute Laune."><meta property="og:url" content="https://fraktion-braeune.de/"><meta property="og:image" content="https://fraktion-braeune.de/vorschau.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"></head><body></body></html>` 200
+	}
+	@geschuetzt {
+		not path /js/pa-* /api/event /favicon.ico /favicon-32.png /apple-touch-icon.png /icon-192.png /icon-512.png /vorschau.jpg
+		not header_regexp User-Agent (?i)(whatsapp|facebookexternalhit|facebookcatalog|telegrambot|twitterbot|slackbot|discordbot|linkedinbot|skypeuripreview|applebot|iMessage|signal)
+	}
 	basic_auth @geschuetzt {
 		fraktion $2b$12$FfJQI/8KNV3hSwMxuud9Ye.tsfo4JtZeMCbgI5inT/gulnosHM.k6
 	}
