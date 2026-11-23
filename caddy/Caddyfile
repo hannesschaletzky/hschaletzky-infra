@@ -156,7 +156,13 @@ fraktion-braeune.de {
 	import standard
 	# PASSWORTSCHUTZ (seit 2026-11-22): Seite nur für Eingeladene, Benutzer „fraktion“.
 	# Hash erzeugen: caddy hash-password  (oder htpasswd -nbB fraktion <passwort>). Wieder öffentlich: Block löschen.
-	basic_auth {
+	# Plausible wie bei hschaletzky.com über die eigene Domain; Zählskript und Ereignisse ohne Passwort
+	@plausible path /js/pa-* /api/event
+	handle @plausible {
+		reverse_proxy plausible:8000
+	}
+	@geschuetzt not path /js/pa-* /api/event
+	basic_auth @geschuetzt {
 		fraktion $2b$12$FfJQI/8KNV3hSwMxuud9Ye.tsfo4JtZeMCbgI5inT/gulnosHM.k6
 	}
 	header X-Robots-Tag "noindex, nofollow"
