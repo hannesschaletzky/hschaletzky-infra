@@ -23,8 +23,24 @@ _GESPERRT="Der Infra-Schlüsselbund blieb gesperrt: Im Fenster von macOS sein Pa
 # Mit -g statt -w, weil nur so eindeutig ist, ob security den Wert als Hex ausgibt (bei Zeichen
 # außerhalb von ASCII: ä, ß, €) oder im Klartext.
 _wert_lesen() {
-  local ausgabe zeile status=0
+  local ausgabe zeile status=0 waechter ton
+  # Ist der Schlüsselbund offen, antwortet security sofort. Dauert es länger, wartet macOS auf das
+  # Passwort: Dann spielt ein Ton, alle 45 Sekunden wieder, bis es eingegeben oder abgebrochen ist.
+  # Das Werkzeug dafür liegt im dotfiles-Repo (freigabe-ton); fehlt es, bleibt es einfach still.
+  ton="$(command -v freigabe-ton 2>/dev/null || true)"
+  [[ -n "$ton" ]] || ton="$HOME/.local/bin/freigabe-ton"
+  (
+    [[ -x "$ton" ]] || exit 0
+    sleep 1.5
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      "$ton" schluesselbund "$(basename "$2" .keychain-db)"
+      sleep "${FREIGABE_TON_ABSTAND:-45}"
+    done
+  ) >/dev/null 2>&1 &
+  waechter=$!
   ausgabe="$(security find-generic-password -a "$USER" -s "$1" -g "$2" 2>&1 >/dev/null)" || status=$?
+  kill "$waechter" 2>/dev/null
+  wait "$waechter" 2>/dev/null
   # 44 heißt bei security: Eintrag nicht gefunden
   [[ "$status" -eq 0 ]] || { [[ "$status" -eq 44 ]] && return 1 || return 2; }
   zeile="$(grep '^password: ' <<< "$ausgabe")" || return 1
